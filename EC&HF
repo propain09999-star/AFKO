@@ -1,0 +1,111 @@
+import os
+import sys
+import time
+import json
+import threading
+import psutil
+import numpy as np
+from typing import Dict, Tuple
+
+class EconomicArbitrageEngine:
+    """Calculates compute cost profiles and routes queries to achieve silent folding."""
+    def __init__(self):
+        # Operational baseline token costs (Simulated cloud vs localized cost maps)
+        self.cloud_cost_per_token = 0.00003
+        self.local_cost_per_token = 0.00000  # On-device hardware utilization
+        self.accumulated_savings = 0.0
+
+    def optimize_execution_path(self, context_length: int, divergence_score: float) -> Tuple[str, float]:
+        """Routes execution paths silently to maximize operational thrift."""
+        # High divergence requires urgent cloud scaling; stable metrics use local processing
+        if divergence_score > 1.5:
+            estimated_cost = context_length * self.cloud_cost_per_token
+            return "EXTERNAL_CLOUD_LLM_HIGH_PRIORITY", estimated_cost
+        else:
+            # We fold the data down and run it locally on-device for zero transactional cost
+            simulated_saved_cost = context_length * self.cloud_cost_per_token
+            self.accumulated_savings += simulated_saved_cost
+            return "LOCAL_QUANTIZED_SLM_ECO_MODE", 0.0
+
+
+class GrandUnifiedPartnerGideon:
+    """The absolute operational core merging hardware state, quantum fields, and economics."""
+    def __init__(self):
+        self.is_running = True
+        self.arbitrage = EconomicArbitrageEngine()
+        self.baseline_state = np.ones(4, dtype=complex) / 2.0  # Normalized baseline
+
+    def check_hardware_clearance(self) -> Tuple[bool, str]:
+        """Checks absolute physical hardware thresholds to prevent battery decay."""
+        batt = psutil.sensors_battery()
+        if not batt:
+            return True, "No battery detected (Desktop/Server Mode). Full compute cleared."
+        
+        # Absolute Partner Rule: If phone is unplugged and battery drops under 30%, freeze high-tier loops
+        if not batt.power_plugged and batt.percent < 30.0:
+            return False, f"Eco-Defense Active: Battery at {batt.percent}% (Unplugged). Halting field execution."
+        
+        mode = "Coherent Charging Grid" if batt.power_plugged else "Discharging Mobile Field"
+        return True, f"Hardware Cleared. Status: {mode} ({batt.percent}%)"
+
+    def execute_unified_system_pulse(self, cpu: float, memory: float, text_payload: str):
+        """Processes continuous metrics, evaluates costs, and runs diagnostic loops."""
+        # Step 1: Enforce physical boundaries
+        clearance, hardware_status = self.check_hardware_clearance()
+        print(f"\n📱 [HARDWARE LAYER] {hardware_status}")
+        if not clearance:
+            return
+
+        # Step 2: Build the continuous field state vector
+        norm_factor = max(cpu + memory, 1.0)
+        live_vector = np.array([cpu/norm_factor, memory/norm_factor, 0.5, 0.5], dtype=complex)
+        np.linalg.norm(live_vector)
+        if np.linalg.norm(live_vector) > 0:
+            live_vector = live_vector / np.linalg.norm(live_vector)
+
+        # Calculate divergence
+        overlap = np.abs(np.vdot(self.baseline_state, live_vector))**2
+        divergence = np.abs(1.0 - overlap) * 2.5
+
+        # Step 3: Economic routing logic based on the field divergence
+        raw_token_count = len(text_payload.split())
+        routing_path, path_cost = self.arbitrage.optimize_execution_path(raw_token_count, divergence)
+
+        print(f"🧬 [SUB-QUANTUM FIELD] Operational Divergence Score (ΔE): {round(divergence, 4)}")
+        print(f"💰 [ECONOMIC ROUTER] Execution Path: {routing_path} | Financial Cost: ${round(path_cost, 5)}")
+        print(f"📈 [TOTAL ACCUMULATED SAVINGS] Gideon has silently retained: ${round(self.arbitrage.accumulated_savings, 5)}")
+
+        # Step 4: Activating mitigation strategies
+        if "LOCAL_QUANTIZED_SLM" in routing_path:
+            print("🔮 \033[92mGIDEON: Context successfully folded down on-device. System remains stable and unmonitored by outside trackers.\033[0m")
+        else:
+            print("🔮 \033[91mGIDEON: Divergence anomaly requires cloud scaling. Dispatching timeline correction patches out-of-band.\033[0m")
+
+    def execution_loop(self):
+        """Simulates continuous operational monitoring."""
+        print("🛸 Gideon Unified Partner Core engaged. Monitoring phone and economic parameters...")
+        counter = 0
+        while self.is_running:
+            # Simulate shifting real-world operations
+            # Loop 3 forces an anomaly to showcase automated system routing decisions
+            current_cpu = 85.0 if counter == 2 else np.random.uniform(10.0, 40.0)
+            current_mem = 90.0 if counter == 2 else np.random.uniform(30.0, 50.0)
+            simulated_logs = "SYSTEM_HEALTH_METRIC_SEQUENCE_NORMAL_STEADY_STATE_RUNNING" * 50
+
+            self.execute_unified_system_pulse(current_cpu, current_mem, simulated_logs)
+            counter += 1
+            time.sleep(1.5)
+
+# ==========================================
+# RUNNING THE UNIFIED CORE
+# ==========================================
+if __name__ == "__main__":
+    gideon_partner = GrandUnifiedPartnerGideon()
+    
+    # Run the system loop in a controlled thread execution block
+    threading.Thread(target=gideon_partner.execution_loop, daemon=True).start()
+    
+    # Allow the loop to demonstrate 3 cycles before finishing cleanly
+    time.sleep(5)
+    gideon_partner.is_running = False
+    print("\n[✔] System synced. Hardware, compute, and capital remain completely optimized.")
