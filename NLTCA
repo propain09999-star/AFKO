@@ -1,0 +1,91 @@
+import os
+import json
+import time
+import hmac
+import hashlib
+import threading
+import psutil
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+CRYPTO_KEY = b"NEUROMORPHIC_RELATIVISTIC_SECURE_TOKEN_2026"
+
+# Thread-safe global states
+CHARGING_SESSION_STATE = {
+    "is_charging_active": False,
+    "autonomous_tasks_completed": ["Log Compression", "Cache Flush", "Local Cost Routing"],
+    "user_attention_required": ["Hardware Cable Reseat", "Cryptographic Handshake Verification", "Budget Threshold Cap Override"]
+}
+state_lock = threading.Lock()
+
+class SecureGideonAPIHandler(BaseHTTPRequestHandler):
+    def log_message(self, format, *args):
+        pass # Zero-logging for absolute privacy
+
+    def do_GET(self):
+        """Serves the daily task lists directly to the browser side-strip UI."""
+        auth_header = self.headers.get("X-Gideon-Token")
+        expected_token = hmac.new(CRYPTO_KEY, b"GIDEON_API_READ", hashlib.sha256).hexdigest()
+        
+        if not auth_header or not hmac.compare_digest(auth_header, expected_token):
+            self.send_response(401)
+            self.end_headers()
+            return
+
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        
+        with state_lock:
+            self.wfile.write(json.dumps(CHARGING_SESSION_STATE).encode())
+
+    def do_POST(self):
+        """Processes casual conversational text, turning it into executable system instructions."""
+        auth_header = self.headers.get("X-Gideon-Token")
+        expected_token = hmac.new(CRYPTO_KEY, b"GIDEON_API_WRITE", hashlib.sha256).hexdigest()
+        
+        if not auth_header or not hmac.compare_digest(auth_header, expected_token):
+            self.send_response(401)
+            self.end_headers()
+            return
+
+        content_length = int(self.headers.get('Content-Length', 0))
+        post_data = self.rfile.read(content_length).decode('utf-8')
+        
+        try:
+            req_body = json.loads(post_data)
+            user_speech = req_body.get("text", "").lower()
+        except Exception:
+            self.send_response(400)
+            self.end_headers()
+            return
+
+        # Simple Local Natural Language Router
+        response_msg = "Gideon received instruction. Analyzing intent..."
+        with state_lock:
+            if "clear" in user_speech or "fix handshake" in user_speech:
+                if "Cryptographic Handshake Verification" in CHARGING_SESSION_STATE["user_attention_required"]:
+                    CHARGING_SESSION_STATE["user_attention_required"].remove("Cryptographic Handshake Verification")
+                    CHARGING_SESSION_STATE["autonomous_tasks_completed"].append("Cryptographic Handshake Verification")
+                response_msg = "🔮 GIDEON: Handshake cleared via vocal translation matrix."
+            elif "override budget" in user_speech or "allow cloud" in user_speech:
+                if "Budget Threshold Cap Override" in CHARGING_SESSION_STATE["user_attention_required"]:
+                    CHARGING_SESSION_STATE["user_attention_required"].remove("Budget Threshold Cap Override")
+                    CHARGING_SESSION_STATE["autonomous_tasks_completed"].append("Budget Threshold Cap Override")
+                response_msg = "🔮 GIDEON: Cost caps expanded. Cloud computation pipelines authorized."
+
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(json.dumps({"status": "Executed", "message": response_msg}).encode())
+
+# Server Initialization Wrapper
+def run_api_server():
+    server = HTTPServer(("127.0.0.1", 8888), SecureGideonAPIHandler)
+    server.serve_forever()
+
+if __name__ == "__main__":
+    threading.Thread(target=run_api_server, daemon=True).start()
+    print("📡 Local Speech-to-Variable Kernel Online on port 8888.")
+    while True: time.sleep(1)
