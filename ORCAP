@@ -1,0 +1,101 @@
+import itertools
+import random
+import hashlib
+from typing import List, Dict, Tuple
+
+class GenomicDataCompressor:
+    """Compresses massive Big Data logs into dense DNA-style token structures."""
+    def __init__(self, k_size: int = 4):
+        self.k_size = k_size
+        # Generate all possible DNA combinations for our compression map (e.g., AAAA, AAAT...)
+        self.bases = ['A', 'T', 'C', 'G']
+        self.k_mers = [''.join(p) for p in itertools.product(self.bases, repeat=k_size)]
+        
+    def log_to_genomic_sequence(self, log_events: List[str]) -> str:
+        """Compresses a sequence of text logs into a highly dense DNA string."""
+        dna_sequence = ""
+        for event in log_events:
+            # Hash the log event to deterministically map it to a specific biological token
+            hash_val = int(hashlib.mdigest = hashlib.sha256(event.encode()).hexdigest(), 16)
+            token_index = hash_val % len(self.k_mers)
+            dna_sequence += self.k_mers[token_index]
+        return dna_sequence
+
+class GraphRAGEngine:
+    """The Omniscient Knowledge Graph holding the root causes and system logic."""
+    def __init__(self):
+        self.knowledge_graph = {}
+        self.root_cause_map = {}
+
+    def inject_knowledge(self, sequence: str, root_cause: str, system_impact: str):
+        """Stores compressed genetic signatures and maps them to actual system health."""
+        self.knowledge_graph[sequence] = {
+            "root_cause": root_cause,
+            "impact_radius": system_impact
+        }
+        # Build index for partial matches (predictive matching)
+        for i in range(0, len(sequence), 4):
+            sub_seq = sequence[i:i+4]
+            if sub_seq not in self.root_cause_map:
+                self.root_cause_map[sub_seq] = []
+            self.root_cause_map[sub_seq].append(root_cause)
+
+    def predictive_analysis(self, live_sequence: str) -> Dict:
+        """Performs predictive Root-Cause Analysis on streaming sequence data."""
+        print(f"🧬 Analyzing Active DNA System Sequence: {live_sequence}\n")
+        
+        # Exact match check
+        if live_sequence in self.knowledge_graph:
+            return {
+                "Match Type": "Exact Match (Omniscient Lock)",
+                "Root Cause": self.knowledge_graph[live_sequence]["root_cause"],
+                "Impact": self.knowledge_graph[live_sequence]["impact_radius"]
+            }
+        
+        # Predictive/Fuzzy match using sequence mutation logic
+        matches = []
+        for i in range(0, len(live_sequence), 4):
+            sub_seq = live_sequence[i:i+4]
+            if sub_seq in self.root_cause_map:
+                matches.extend(self.root_cause_map[sub_seq])
+                
+        if matches:
+            most_likely_cause = max(set(matches), key=matches.count)
+            return {
+                "Match Type": "Predictive Generation (Sequence Mutation Detected)",
+                "Most Likely Root Cause": most_likely_cause,
+                "Confidence Score": f"{round((matches.count(most_likely_cause) / len(matches)) * 100, 2)}%"
+            }
+            
+        return {"Status": "Unknown sequence mutation. System stable or unmapped."}
+
+# ==========================================
+# EXECUTION DAG (Running the Architecture)
+# ==========================================
+
+# 1. Initialize Engines
+compressor = GenomicDataCompressor(k_size=4)
+rag_system = GraphRAGEngine()
+
+# 2. Ingesting Historic Big Data (Training the Knowledge Graph)
+historic_logs_cluster_1 = ["DB_Timeout_504", "Kafka_Buffer_Full", "Auth_Token_Expired"]
+historic_logs_cluster_2 = ["Memory_Leak_0x4F", "Garbage_Collection_Spike", "Container_Killed"]
+
+dna_sig_1 = compressor.log_to_genomic_sequence(historic_logs_cluster_1)
+dna_sig_2 = compressor.log_to_genomic_sequence(historic_logs_cluster_2)
+
+# Injecting into GraphRAG
+rag_system.inject_knowledge(dna_sig_1, "Database Connection Pool Exhaustion", "High Impact - User Checkout Failed")
+rag_system.inject_knowledge(dna_sig_2, "Uncapped JVM Heap Allocation", "Critical Impact - Microservice Cascade Failure")
+
+# 3. Live Streaming Big Data Analytics (Predictive Testing)
+# Let's simulate a live failure that is *similar* but mutated
+live_incoming_logs = ["DB_Timeout_504", "Kafka_Buffer_Full", "Network_Latency_Spike"] 
+live_dna_sequence = compressor.log_to_genomic_sequence(live_incoming_logs)
+
+# Run the Omniscient Predictive Analysis
+rca_result = rag_system.predictive_analysis(live_dna_sequence)
+
+# Print Results cleanly
+for key, value in rca_result.items():
+    print(f"➡️ {key}: {value}")
