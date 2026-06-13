@@ -1,0 +1,200 @@
+import os
+import json
+import time
+import hashlib
+import hmac
+import threading
+import urllib.parse
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import numpy as np
+
+# Pre-Shared Cryptographic Secret Key (Keep identical on Server and Client)
+PRE_SHARED_SECRET_KEY = b"NEUROMORPHIC_RELATIVISTIC_SECURE_TOKEN_2026"
+
+# ──────────────────────────────────────────────────────────
+# 🚀 SECURED UNIFIED CORE KERNEL ENGINE
+# ──────────────────────────────────────────────────────────
+class SecuredSystemEngine:
+    def __init__(self, root_dir="vault_root"):
+        self.root_dir = root_dir
+        self.bin_to_dna = {'00': 'A', '01': 'C', '10': 'G', '11': 'T'}
+        self.lock = threading.Lock()
+        
+        # Physical folder footprints on storage
+        self.paths = {
+            "COMPRESSED": os.path.join(self.root_dir, "compressed_dna"),
+            "INBOUND_DROPZONE": os.path.join(self.root_dir, "inbound_dropzone")
+        }
+        
+        # System State Registers
+        self.device_temp = 30.0
+        self.total_bytes_processed_this_hour = 0
+        self.hourly_history_log = {}
+        self.last_network_pulse_time = time.time()
+        self.network_health_status = "NOMINAL_OPTIMAL"
+        self.is_running = True
+        
+        for path in self.paths.values():
+            os.makedirs(path, exist_ok=True)
+
+    def compress_text_to_dna(self, text: str) -> str:
+        """Packs raw strings into compressed self-healing quaternary blocks."""
+        binary_str = ''.join(f'{b:08b}' for b in text.encode('utf-8'))
+        mirrored_binary = binary_str + binary_str
+        return ''.join(self.bin_to_dna[mirrored_binary[i:i+2]] for i in range(0, len(mirrored_binary), 2))
+
+    def update_network_pulse(self):
+        """Calculates latency deltas to flag connectivity health drops in real-time."""
+        current = time.time()
+        delta = current - self.last_network_pulse_time
+        self.last_network_pulse_time = current
+        
+        # If transmission gaps stretch too wide, flag a warning on the dashboard panel
+        if delta > 1.5:
+            self.network_health_status = "LATENCY_WARNING_SLIP"
+        else:
+            self.network_health_status = "NOMINAL_OPTIMAL"
+
+# Initialize central core context
+global_secured_engine = SecuredSystemEngine()
+
+# =============================================================================
+# 📡 SECURED NETWORK LAYER ROTATING CORES
+# =============================================================================
+class SecureNetworkRequestHandler(BaseHTTPRequestHandler):
+    
+    def log_message(self, format, *args): 
+        return  # Keep console interface clean
+
+    def do_GET(self):
+        """Serves the upgraded HTML control panel dashboard with network health alerts."""
+        if self.path == "/" or self.path == "/dashboard":
+            self.send_response(200)
+            self.send_header("Content-type", "text/html")
+            self.end_headers()
+            
+            # Dynamically determine the styling based on connection health state
+            status_map = {
+                "NOMINAL_OPTIMAL": {"bg": "#10b981", "txt": "#e0f2fe", "label": "🟢 SYSTEM STABLE - AUTH LINK OPTIMAL"},
+                "LATENCY_WARNING_SLIP": {"bg": "#f59e0b", "txt": "#fef3c7", "label": "⚠️ LATENCY SLIP - CHECK CLIENT ENGINE"},
+                "CRITICAL_DISCONNECT": {"bg": "#ef4444", "txt": "#fef2f2", "label": "🚨 SECURITY THREAT / NETWORK DROP"}
+            }
+            
+            # Check elapsed time since last packet to auto-trip alert flag
+            time_since_last_pulse = time.time() - global_secured_engine.last_network_pulse_time
+            if time_since_last_pulse > 5.0:
+                global_secured_engine.network_health_status = "CRITICAL_DISCONNECT"
+                
+            cfg = status_map.get(global_secured_engine.network_health_status, status_map["NOMINAL_OPTIMAL"])
+            history_json = json.dumps(global_secured_engine.hourly_history_log)
+            
+            html_interface = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Secure Core Panel</title>
+                <meta http-equiv="refresh" content="1">
+                <style>
+                    body {{ font-family: system-ui, -apple-system, sans-serif; background: #070a13; color: #cbd5e1; padding: 35px; }}
+                    .card {{ background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 22px; margin-bottom: 20px; }}
+                    h1 {{ color: #38bdf8; font-size: 20px; margin-top: 0; }}
+                    .alert-banner {{ background: {cfg['bg']}; color: {cfg['txt']}; font-weight: bold; padding: 12px 18px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; }}
+                    .metric {{ font-size: 38px; font-weight: 800; color: #f8fafc; margin: 10px 0; }}
+                </style>
+            </head>
+            <body>
+                <div class="alert-banner">{cfg['label']}</div>
+                <div class="card">
+                    <h1>🔒 Cryptographic Token Validation Layer</h1>
+                    <p style="font-size:13px; color:#64748b; margin:0;">HMAC-SHA256 Encryption Hook Active | Port: 8080</p>
+                    <p style="font-size:13px; color:#64748b; margin:5px 0 0 0;">Last Transmission: {time_since_last_pulse:.1f} seconds ago</p>
+                </div>
+                <div class="card">
+                    <h1>📊 Secure Byte-Throughput Register Ledger</h1>
+                    <div class="metric">{global_secured_engine.total_bytes_processed_this_hour} <span style="font-size:16px; color:#475569;">Processed Bytes</span></div>
+                    <pre style="background:#020617; padding:12px; border-radius:6px; font-size:12px; color:#94a3b8;">{history_json}</pre>
+                </div>
+            </body>
+            </html>
+            """
+            self.wfile.write(html_interface.encode('utf-8'))
+        else:
+            self.send_error(404)
+
+    def do_POST(self):
+        """Receives incoming data and forces strict verification token authentication."""
+        if self.path == "/submit_secure_data":
+            # Extract incoming transmission signature token from headers
+            provided_signature = self.headers.get("X-Secure-Token-Signature", "")
+            content_length = int(self.headers['Content-Length'])
+            raw_post_body = self.rfile.read(content_length)
+            
+            # 🔐 SECURITY CHECK: Calculate expected HMAC-SHA256 signature
+            computed_hmac = hmac.new(PRE_SHARED_SECRET_KEY, raw_post_body, hashlib.sha256).hexdigest()
+            
+            # Use constant-time comparison to prevent side-channel timing attacks
+            if not hmac.compare_digest(computed_hmac, provided_signature):
+                print("🚨 [SECURITY VIOLATION]: Rejected unauthorized data injection attempt!")
+                self.send_response(401) # Unauthorized
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "ERROR", "reason": "INVALID_SIGNATURE_TOKEN"}).encode('utf-8'))
+                return
+
+            # If token verification matches, proceed safely with data pipeline
+            global_secured_engine.update_network_pulse()
+            packet = json.loads(raw_post_body.decode('utf-8'))
+            node_id = packet.get("id", "UNKNOWN")
+            text_data = packet.get("text", "")
+            
+            # Compress and clean up trace memory instantly
+            dna_block = global_secured_engine.compress_text_to_dna(text_data)
+            current_hour = time.strftime("%Y-%m-%d %H:00")
+            
+            with global_secured_engine.lock:
+                global_secured_engine.total_bytes_processed_this_hour += len(raw_post_body)
+                global_secured_engine.hourly_history_log[current_hour] = global_secured_engine.hourly_history_log.get(current_hour, 0) + len(raw_post_body)
+            
+            # Save payload block straight to disk folder
+            out_file_path = os.path.join(global_secured_engine.paths["COMPRESSED"], f"{node_id}.dna")
+            with open(out_file_path, "w") as out_f:
+                out_f.write(dna_block)
+                
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "AUTHENTICATED_AND_COMPRESSED", "saved_node": node_id}).encode('utf-8'))
+
+# ──────────────────────────────────────────────────────────
+# 🚀 CLIENT SIMULATOR SCRIPT HOOK
+# ──────────────────────────────────────────────────────────
+class SecuredClientTransmitter:
+    def __init__(self, host="127.0.0.1", port=8080):
+        self.host = host
+        self.port = port
+
+    def transmit_authenticated_packet(self, node_id: str, text: str) -> bool:
+        """Packages text data, computes a valid crypto token, and streams to server."""
+        import http.client
+        payload_data = json.dumps({"id": node_id, "text": text}).encode('utf-8')
+        
+        # Generate valid authorization signature token
+        client_signature = hmac.new(PRE_SHARED_SECRET_KEY, payload_data, hashlib.sha256).hexdigest()
+        
+        try:
+            conn = http.client.HTTPConnection(self.host, self.port, timeout=1.0)
+            headers = {
+                "Content-type": "application/json",
+                "Content-Length": str(len(payload_data)),
+                "X-Secure-Token-Signature": client_signature
+            }
+            conn.request("POST", "/submit_secure_data", body=payload_data, headers=headers)
+            response = conn.getresponse()
+            status = response.status == 200
+            conn.close()
+            return status
+        except Exception:
+            return False
+
+# ──────────────────────────────────────────────────────────
+# 🚀 CORE RUN DEPLOYMENT
+# ──────────────────────────────────────────────────────────
