@@ -1,0 +1,189 @@
+import asyncio
+import json
+import time
+import hashlib
+import hmac
+import re
+
+# --- CRYPTOGRAPHIC ENGINE AND UNIFIED PAYLOAD LAYER ---
+SECRET_KEY = b"SOVEREIGN_ARCHITECT_SECRET_KEY_2026"
+
+def create_secure_packet(layer, vector, target, payload):
+    """Utility to sign payloads at the remote collection node before transport."""
+    payload_bytes = json.dumps(payload, sort_keys=True).encode()
+    signature = hmac.new(SECRET_KEY, payload_bytes, hashlib.sha256).hexdigest()
+    return json.dumps({
+        "timestamp_epoch": int(time.time() * 1000),
+        "source_layer": layer.upper(),
+        "vector": vector.upper(),
+        "target": target.upper(),
+        "payload": payload,
+        "signature": signature
+    })
+
+def verify_secure_packet(packet_json):
+    """Validates payload integrity using HMAC-SHA256 signatures."""
+    try:
+        data = json.loads(packet_json)
+        received_sig = data.get("signature")
+        if not received_sig:
+            return False, "Unsigned packet rejected."
+        
+        payload_bytes = json.dumps(data["payload"], sort_keys=True).encode()
+        expected_sig = hmac.new(SECRET_KEY, payload_bytes, hashlib.sha256).hexdigest()
+        
+        if hmac.compare_digest(received_sig, expected_sig):
+            return True, data
+        return False, "Data altered or untrusted."
+    except Exception as e:
+        return False, f"Validation failure: {str(e)}"
+
+
+# --- SUB-QUARK & QUARK POLYGLOT ENGINE (Ultra-Low Memory) ---
+class SubQuarkPolyglotErrorCatcher:
+    """Memory Footprint: <3MB. Sniffs raw system sockets for native application error dumps."""
+    def __init__(self):
+        # Captures stack traces across Rust (panic), C++ (segfault), Python/Node (traceback), and Go (panic)
+        self.error_signature = re.compile(
+            r'(thread.*panicked|segmentation.*fault|traceback.*most.*recent.*call|panic.*goroutine)', 
+            re.IGNORECASE
+        )
+
+    async def sniff_runtime_dump(self, raw_socket_buffer):
+        if self.error_signature.search(raw_socket_buffer):
+            return create_secure_packet(
+                layer="SUB_QUARK",
+                vector="POLYGLOT_RUNTIME_CRASH",
+                target="CLUSTER_NODE_ENVIRONMENT",
+                payload={"raw_dump_sample": raw_socket_buffer[:150], "crash_detected": True}
+            )
+        return None
+
+class QuarkPolyglotCorrectionCrawler:
+    """Memory Footprint: ~8MB. Fast text-stream scraper targeting zero-day patch code modifications."""
+    def __init__(self):
+        # Targets critical fixes like pointer corrections, boundary checks, or memory sanitizers
+        self.correction_signature = re.compile(
+            r'(fix.*vuln|cve-2026|patch.*overflow|bound.*check|null.*pointer)', 
+            re.IGNORECASE
+        )
+
+    async def scan_repository_commits(self, commit_diff_text, repo_name):
+        if self.correction_signature.search(commit_diff_text):
+            return create_secure_packet(
+                layer="QUARK",
+                vector="POLYGLOT_CODE_PATCH",
+                target=repo_name,
+                payload={"patch_context": commit_diff_text[:150], "exploit_window_closed": False}
+            )
+        return None
+
+
+# --- MACRO FINANCIONALS & LIQUIDITY INGESTION FEED ---
+class MacroLiquidityMiner:
+    """Asynchronously queries institutional credit vectors without browser overhead."""
+    async def fetch_sofr_and_rrp_bounds(self):
+        await asyncio.sleep(0.1) # Simulate wire latency
+        # Tracking Reverse Repo Facility usage deltas and Secured Overnight Financing Rate volatility [2]
+        return create_secure_packet(
+            layer="QUARK",
+            vector="MACRO_LIQUIDITY_SHIFT",
+            target="FED_REPO_MARKETS",
+            payload={"rrp_volume_billions": 420.5, "sofr_volatility_bps": +4.2}
+        )
+
+
+# --- SECURE LOCAL PORTFOLIO LEDGER & SYSTEM RADAR ---
+class SystemSovereignLedger:
+    def __init__(self):
+        self.portfolio = {
+            "SHORT_TERM": {"USD": 0.0, "ASSETS": {}},
+            "MEDIUM_TERM": {"USD": 0.0, "ASSETS": {}},
+            "LONG_TERM": {"USD": 0.0, "ASSETS": {}}
+        }
+
+    def update_allocation(self, horizon, asset, action, dollar_value):
+        self.portfolio[horizon]["ASSETS"][asset] = {
+            "action": action.upper(),
+            "allocated_usd": float(dollar_value),
+            "timestamp": int(time.time())
+        }
+        self.portfolio[horizon]["USD"] = sum(
+            item["allocated_usd"] for item in self.portfolio[horizon]["ASSETS"].values()
+        )
+        self.render_dashboard()
+
+    def render_dashboard(self):
+        print("\n" + "👁️ " + "="*65)
+        print("📊 SOVEREIGN PORTFOLIO STATUS | UNLIMITED PREP ACTIVE")
+        print("="*67)
+        for horizon in ["SHORT_TERM", "MEDIUM_TERM", "LONG_TERM"]:
+            total = self.portfolio[horizon]["USD"]
+            print(f" 🟩 {horizon:<12} Total Exposure: ${total:,.2f}")
+            for asset, details in self.portfolio[horizon]["ASSETS"].items():
+                print(f"   ├─ {asset:<25} -> {details['action']:<15} Amount: ${details['allocated_usd']:,.2f}")
+        print("="*67 + "\n")
+
+
+# --- CENTRAL PURPLE PROCESSING MATRIX ---
+class SovereignMatrixOrchestrator:
+    def __init__(self):
+        self.ledger = SystemSovereignLedger()
+        self.error_sniffer = SubQuarkPolyglotErrorCatcher()
+        self.patch_crawler = QuarkPolyglotCorrectionCrawler()
+        self.macro_miner = MacroLiquidityMiner()
+
+    async def process_inbound_stream(self, raw_packet_json):
+        # Cryptographic Validation Layer
+        valid, verified_data = verify_secure_packet(raw_packet_json)
+        if not valid:
+            print(f"🚨 [SECURITY EXCLUSION] Packet validation dropped: {verified_data}")
+            return
+        
+        vector = verified_data["vector"]
+        target = verified_data["target"]
+        payload = verified_data["payload"]
+
+        # Strategy Trigger Routing Matrix
+        if vector == "POLYGLOT_RUNTIME_CRASH":
+            print(f"💥 [RED VECTOR] Critical multi-language application crash in progress on {target}!")
+            # Trigger defensive action on exposed technology indices
+            self.ledger.update_allocation("SHORT_TERM", "TECH_INDEX_SHORT_SWING", "EXECUTE_SHORT", 950000)
+
+        elif vector == "POLYGLOT_CODE_PATCH":
+            print(f"🛠️ [BLUE VECTOR] Private zero-day exploit fix uncovered on repository: {target}!")
+            # Capitalize on the vulnerability exposure window before the patch goes public
+            self.ledger.update_allocation("SHORT_TERM", "EXPOSED_INFRASTRUCTURE_SHORT", "EXECUTE_SHORT", 400000)
+
+        elif vector == "MACRO_LIQUIDITY_SHIFT" and payload["sofr_volatility_bps"] > 3.0:
+            print(f"💸 [MACRO VECTOR] Repo markets showing structural dollar strain [2].")
+            # De-leverage crypto and high-beta assets due to systemic liquidity contraction
+            self.ledger.update_allocation("SHORT_TERM", "HIGH_LEVERAGE_CRYPTO", "LIQUIDATE", 0)
+
+
+# --- LIVE TCP SOCKET SIMULATION & ORCHESTRATION ---
+async def start_sovereign_node():
+    orchestrator = SovereignMatrixOrchestrator()
+    print("🛡️ Sovereign Node Initialized. Multi-pathway tracking active.")
+
+    # 1. Simulate inbound multi-language raw error dumps (Sub-Quark Processing)
+    sample_rust_panic = "thread 'main' panicked at 'index out of bounds: len is 5 but index is 12', core/src/crypto.rs:42"
+    crash_packet = await orchestrator.error_sniffer.sniff_runtime_dump(sample_rust_panic)
+    
+    # 2. Simulate inbound unauthenticated open-source patch streams (Quark Processing)
+    sample_git_diff = "@@ -14,4 +14,7 @@\n+ // Add boundary check to prevent CVE-2026 overflow\n+ if (buffer_ptr >= end_ptr) return null_pointer;\n  memcpy(dest, src, size);"
+    patch_packet = await orchestrator.patch_crawler.scan_repository_commits(sample_git_diff, "linux-kernel-core-mirror")
+
+    # 3. Simulate continuous macroeconomic banking telemetry feeds
+    liquidity_packet = await orchestrator.macro_miner.fetch_sofr_and_rrp_bounds()
+
+    # Route secure streams straight into the evaluation matrix
+    if crash_packet:
+        await orchestrator.process_inbound_stream(crash_packet)
+    if patch_packet:
+        await orchestrator.process_inbound_stream(patch_packet)
+    if liquidity_packet:
+        await orchestrator.process_inbound_stream(liquidity_packet)
+
+if __name__ == "__main__":
+    asyncio.run(start_sovereign_node())
