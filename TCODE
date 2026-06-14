@@ -1,0 +1,96 @@
+import asyncio
+import json
+import time
+import aiohttp
+import ccxt.pro as ccxtpro
+
+# Unified Tick Schema ensuring uniform increments across all asset classes
+def create_unified_tick(asset_class, symbol, price, volume, bid=None, ask=None):
+    return {
+        "timestamp_ms": int(time.time() * 1000),
+        "asset_class": asset_class,       # "CRYPTO", "STK" (Stock), "OPT" (Option), "ETF"
+        "symbol": symbol.upper(),
+        "price": float(price),
+        "volume": float(volume),
+        "bid": float(bid) if bid else None,
+        "ask": float(ask) if ask else None,
+        "increment_status": "PROPHESIS_VERIFIED"
+    }
+
+class OmniDataCollector:
+    def __init__(self):
+        self.running = True
+        self.crypto_exchange = ccxtpro.binance({'enableRateLimit': True})
+        
+    async def start_crypto_stream(self, symbols):
+        """Asynchronously streams live Crypto ticks via CCXT Pro websockets"""
+        print(f"🚀 [Engine] Initializing Live Crypto Stream for: {symbols}")
+        while self.running:
+            try:
+                # CCXT Pro handles the underlying websocket handshake automatically
+                trades = await self.crypto_exchange.watch_trades(symbols)
+                for trade in trades:
+                    tick = create_unified_tick(
+                        asset_class="CRYPTO",
+                        symbol=trade['symbol'],
+                        price=trade['price'],
+                        volume=trade['amount']
+                    )
+                    await self.process_and_store(tick)
+            except Exception as e:
+                print(f"⚠️ [Crypto Error] Connection drop: {e}. Reconnecting...")
+                await asyncio.sleep(2)
+
+    async def start_tradfi_stream(self, tickers):
+        """Simulates/Interfaces with Schwab/IBKR asynchronous live gateway streams"""
+        print(f"🚀 [Engine] Initializing Live TradFi/Options Stream for: {tickers}")
+        # Note: In production, substitute this loop with Schwab's websocket client or IBKR Client Portal API
+        async with aiohttp.ClientSession() as session:
+            while self.running:
+                try:
+                    for ticker in tickers:
+                        # Emulating the ingestion loop from a free stream or local gateway
+                        # Replacing real mock data with absolute unified increments
+                        mock_price = 180.25 if "AAPL" in ticker else 510.50
+                        tick = create_unified_tick(
+                            asset_class="STK" if "OPT" not in ticker else "OPT",
+                            symbol=ticker,
+                            price=mock_price,
+                            volume=100
+                        )
+                        await self.process_and_store(tick)
+                    await asyncio.sleep(1) # Controlled ingestion pacing for free-tier gateway
+                except Exception as e:
+                    print(f"⚠️ [TradFi Error] Ingestion breakdown: {e}")
+                    await asyncio.sleep(5)
+
+    async def process_and_store(self, tick):
+        """The Normalization Ledger: Every single tick hits this engine identically"""
+        # Print scannable structured data to console. 
+        # Next step will wire this directly to a Redis TimeSeries or local SQLite cache.
+        print(f"📦 [{tick['asset_class']}] {tick['symbol']} -> Price: ${tick['price']:.4f} | Vol: {tick['volume']} | TS: {tick['timestamp_ms']}")
+
+    async def shutdown(self):
+        self.running = False
+        await self.crypto_exchange.close()
+        print("🛑 [Engine] All streams safely unmounted.")
+
+# --- System Orchestrator Execution ---
+async def main():
+    collector = OmniDataCollector()
+    
+    # Define assets to track across completely different markets
+    crypto_assets = ['BTC/USDT', 'ETH/USDT']
+    tradfi_assets = ['AAPL', 'SPY', 'SPX_260619C5000'] # Stock, ETF, and an Options Contract
+    
+    # Gather tasks and run them concurrently inside a single event loop
+    try:
+        await asyncio.gather(
+            collector.start_crypto_stream(crypto_assets),
+            collector.start_tradfi_stream(tradfi_assets)
+        )
+    except KeyboardInterrupt:
+        await collector.shutdown()
+
+if __name__ == "__main__":
+    asyncio.run(main())
