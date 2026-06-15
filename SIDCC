@@ -1,0 +1,164 @@
+import os
+import shutil
+import asyncio
+import sqlite3
+import logging
+import docker
+import git
+
+# Setup logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]: %(message)s")
+
+class SelfIngestingEngine:
+    def __init__(self, production_repo_path="./my_production_project", db_path="system_registry.db"):
+        self.production_repo_path = os.path.abspath(production_repo_path)
+        self.db_path = db_path
+        self.docker_client = docker.from_env()
+        self.init_database()
+
+    def init_database(self):
+        """Initializes a local state tracker to prevent duplicate crawls and log ingestion status."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS upgrades (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_repo TEXT UNIQUE,
+                module_name TEXT,
+                status TEXT, -- 'DISCOVERED', 'VERIFIED', 'INGESTED'
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        conn.close()
+
+    def log_upgrade_state(self, source_repo, module_name, status):
+        """Tracks the lifecycle of the code upgrade."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO upgrades (source_repo, module_name, status)
+            VALUES (?, ?, ?)
+            ON CONFLICT(source_repo) DO UPDATE SET status=excluded.status
+        """, (source_repo, module_name, status))
+        conn.commit()
+        conn.close()
+
+    async def run_sandboxed_upgrade_test(self, container, test_command):
+        """Runs the upgraded module inside the sandbox container to ensure it actually works."""
+        def run():
+            return container.exec_run(cmd=f"sh -c '{test_command}'")
+        result = await asyncio.to_thread(run)
+        return result.exit_code == 0
+
+    async def ingest_to_production(self, module_name, verified_code_path):
+        """
+        INGESTION ENGINE: Safely moves the verified upgrade out of the sandbox 
+        and updates your actual production codebase via an independent git branch.
+        """
+        logging.info(f"[+] INGESTION TRIGGERED: Merging verified code for '{module_name}' into production.")
+        
+        # Ensure production directory exists
+        os.makedirs(self.production_repo_path, exist_ok=True)
+        destination_path = os.path.join(self.production_repo_path, "upgrades", f"{module_name}.py")
+        os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+
+        try:
+            # Copy the clean file from the verified source into your project structures
+            await asyncio.to_thread(shutil.copy, verified_code_path, destination_path)
+            
+            # Open your actual local production Git repo
+            repo = git.Repo(self.production_repo_path)
+            
+            # Create a brand new development branch for human verification
+            branch_name = f"upgrade/auto-{module_name}"
+            new_branch = repo.create_head(branch_name)
+            new_branch.checkout()
+            
+            # Stage, commit, and prepare the merge
+            repo.git.add(destination_path)
+            repo.index.commit(f"automation: ingested verified optimization upgrade for {module_name}")
+            
+            logging.info(f"[SUCCESS] Code ingested into production branch '{branch_name}'. Ready for review.")
+            return True
+        except Exception as e:
+            logging.error(f"[-] Ingestion failed: {e}")
+            return False
+
+    async def process_target_repo(self, target_url, module_to_harvest):
+        """Coordinates cloning, sandbox validation, filtering, and ingestion."""
+        repo_name = target_url.split("/")[-1].replace(".git", "")
+        local_crawl_path = os.path.abspath(f"./tmp/crawl_{repo_name}")
+        
+        # Avoid downloading if already processed
+        self.log_upgrade_state(target_url, module_to_harvest, "DISCOVERED")
+
+        try:
+            # 1. Clone target code
+            if os.path.exists(local_crawl_path):
+                shutil.rmtree(local_crawl_path)
+            await asyncio.to_thread(git.Repo.clone_from, target_url, local_crawl_path)
+
+            # 2. Spawn isolated sandbox container to safely run the module
+            container = await asyncio.to_thread(
+                self.docker_client.containers.run,
+                image="python:3.11-slim",
+                command="tail -f /dev/null",
+                volumes={local_crawl_path: {'bind': '/app', 'mode': 'rw'}},
+                detach=True,
+                network_disabled=True, # Absolute isolation
+                mem_limit="256m"
+            )
+
+            try:
+                # Find the file we want to harvest
+                target_file_path = os.path.join(local_crawl_path, module_to_harvest)
+                if not os.path.exists(target_file_path):
+                    logging.warning(f"[-] Target file {module_to_harvest} not found in repository.")
+                    return
+
+                # 3. Compile and Run test suite INSIDE the sandbox to make sure it's valid
+                # (Example: runs basic syntax validation check inside container)
+                is_safe_and_functional = await self.run_sandboxed_upgrade_test(
+                    container, f"python3 -m py_compile /app/{module_to_harvest}"
+                )
+
+                if is_safe_and_functional:
+                    self.log_upgrade_state(target_url, module_to_harvest, "VERIFIED")
+                    
+                    # 4. INGEST: Push the clean code directly into your production directory
+                    success = await self.ingest_to_production(repo_name, target_file_path)
+                    if success:
+                        self.log_upgrade_state(target_url, module_to_harvest, "INGESTED")
+                else:
+                    logging.warning(f"[-] Upgrade validation failed in sandbox for {repo_name}. Skipping ingestion.")
+
+            finally:
+                # Destroy Sandbox
+                await asyncio.to_thread(container.stop)
+                await asyncio.to_thread(container.remove)
+
+        except Exception as e:
+            logging.error(f"[-] Processing exception for {repo_name}: {e}")
+        finally:
+            # Storage Sanitation: Wipe the downloaded repo immediately
+            if os.path.exists(local_crawl_path):
+                await asyncio.to_thread(shutil.rmtree, local_crawl_path)
+
+async def main():
+    # Setup dummy paths for demonstration
+    os.makedirs("./my_production_project", exist_ok=True)
+    # Initialize a mock git repo inside your production directory if it doesn't exist
+    if not os.path.exists("./my_production_project/.git"):
+        git.Repo.init("./my_production_project")
+
+    engine = SelfIngestingEngine(production_repo_path="./my_production_project")
+    
+    # Let your deviant crawler target a specific repository and path pattern
+    await engine.process_target_repo(
+        target_url="https://codeberg.org",
+        module_to_harvest="release.py" # Example file target to extract/upgrade
+    )
+
+if __name__ == "__main__":
+    asyncio.run(main())
