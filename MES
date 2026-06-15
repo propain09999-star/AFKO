@@ -1,0 +1,171 @@
+import os
+import shutil
+import asyncio
+import sqlite3
+import logging
+import docker
+import git
+from openai import OpenAI
+
+# Initialize Logging and AI Engine
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]: %(message)s")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", "your-api-key-here"))
+
+class SelfAdaptingIngestionEngine:
+    def __init__(self, production_repo_path="./my_production_project", db_path="system_registry.db"):
+        self.production_repo_path = os.path.abspath(production_repo_path)
+        # Establish a dedicated vendor directory for incoming code upgrades
+        self.vendor_dir = os.path.join(self.production_repo_path, "vendor")
+        self.db_path = db_path
+        self.docker_client = docker.from_env()
+        
+        os.makedirs(self.vendor_dir, exist_ok=True)
+        self.init_database()
+
+    def init_database(self):
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS upgrades (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_repo TEXT UNIQUE,
+                module_name TEXT,
+                status TEXT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        conn.close()
+
+    def update_db_status(self, source_repo, module_name, status):
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO upgrades (source_repo, module_name, status)
+            VALUES (?, ?, ?)
+            ON CONFLICT(source_repo) DO UPDATE SET status=excluded.status
+        """, (source_repo, module_name, status))
+        conn.commit()
+        conn.close()
+
+    async def ai_transform_filter(self, raw_code, module_name):
+        """
+        AI FILTER STRATEGY: Rewrites incoming external code structures to natively
+        match your local project's coding conventions, paths, and patterns.
+        """
+        logging.info(f"[*] AI Filter: Adapting code styles for '{module_name}'...")
+        
+        prompt = f"""
+        You are a code refactoring engine. Your goal is to adapt an external code module to fit our project conventions.
+        
+        PROJECT RULES:
+        1. All incoming vendor functions must be imported or accessible via an internal structure.
+        2. Any logging must use standard Python logging, not raw prints.
+        3. Make sure variable names conform to snake_case.
+        4. Do not alter the core logic or functionality of the upgrade, only its imports, formatting, and naming interface.
+
+        Respond with ONLY the refactored, raw executable code. Do not include markdown code block syntax (like ```python).
+        
+        RAW EXTERNAL CODE:
+        {raw_code}
+        """
+        
+        # Using a fast, deterministic code processing step
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1
+        )
+        
+        return response.choices.message.content.strip()
+
+    async def run_sandbox_validation(self, container, filename):
+        """Verifies that the AI-transformed module doesn't contain compile or syntax errors."""
+        def run():
+            return container.exec_run(cmd=f"python3 -m py_compile /app/{filename}")
+        result = await asyncio.to_thread(run)
+        return result.exit_code == 0
+
+    async def process_and_ingest(self, target_url, file_to_harvest):
+        repo_name = target_url.split("/")[-1].replace(".git", "")
+        local_crawl_path = os.path.abspath(f"./tmp/crawl_{repo_name}")
+        
+        self.update_db_status(target_url, file_to_harvest, "CRAWLED")
+
+        try:
+            # 1. Fetch raw codebase
+            if os.path.exists(local_crawl_path):
+                shutil.rmtree(local_crawl_path)
+            await asyncio.to_thread(git.Repo.clone_from, target_url, local_crawl_path)
+
+            source_file = os.path.join(local_crawl_path, file_to_harvest)
+            if not os.path.exists(source_file):
+                logging.warning(f"[-] Target file {file_to_harvest} missing from remote repository.")
+                return
+
+            with open(source_file, "r", encoding="utf-8", errors="ignore") as f:
+                raw_code = f.read()
+
+            # 2. Transform the code via the AI Filter Engine
+            adapted_code = await self.ai_transform_filter(raw_code, file_to_harvest)
+
+            # Save the adapted code to a temporary holding location for sandbox inspection
+            sandbox_hold_dir = os.path.abspath("./tmp/sandbox_hold")
+            os.makedirs(sandbox_hold_dir, exist_ok=True)
+            sandbox_file_path = os.path.join(sandbox_hold_dir, f"adapted_{file_to_harvest}")
+            
+            with open(sandbox_file_path, "w", encoding="utf-8") as f:
+                f.write(adapted_code)
+
+            # 3. Create isolated Docker Container to verify the AI's transformation work
+            container = await asyncio.to_thread(
+                self.docker_client.containers.run,
+                image="python:3.11-slim",
+                command="tail -f /dev/null",
+                volumes={sandbox_hold_dir: {'bind': '/app', 'mode': 'rw'}},
+                detach=True,
+                network_disabled=True,
+                mem_limit="256m"
+            )
+
+            try:
+                # 4. Check if the newly refactored code passes compilation
+                is_valid = await self.run_sandbox_validation(container, f"adapted_{file_to_harvest}")
+                
+                if is_valid:
+                    # 5. PLUGIN STRATEGY: Save the verified, AI-adapted file directly into your vendor directory
+                    final_destination = os.path.join(self.vendor_dir, f"{repo_name}_{file_to_harvest}")
+                    await asyncio.to_thread(shutil.copy, sandbox_file_path, final_destination)
+                    
+                    self.update_db_status(target_url, file_to_harvest, "INGESTED")
+                    logging.info(f"[SUCCESS] Ingested adapted upgrade into: {final_destination}")
+                else:
+                    logging.error(f"[-] AI adaptation created a syntax error in sandbox for {repo_name}. Rejecting file.")
+                    self.update_db_status(target_url, file_to_harvest, "REJECTED_TRANSFORM_FAIL")
+
+            finally:
+                # Cleanup container
+                await asyncio.to_thread(container.stop)
+                await asyncio.to_thread(container.remove)
+                if os.path.exists(sandbox_hold_dir):
+                    shutil.rmtree(sandbox_hold_dir)
+
+        except Exception as e:
+            logging.error(f"[-] Operational failure: {e}")
+        finally:
+            # Wipe crawled repository
+            if os.path.exists(local_crawl_path):
+                await asyncio.to_thread(shutil.rmtree, local_crawl_path)
+
+async def main():
+    engine = SelfAdaptingIngestionEngine(production_repo_path="./my_production_project")
+    
+    # Run the ingestion sequence
+    await engine.process_and_ingest(
+        target_url="https://codeberg.org",
+        file_to_harvest="release.py"
+    )
+
+if __name__ == "__main__":
+    asyncio.run(main())
