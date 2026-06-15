@@ -1,0 +1,31 @@
+name: Continuous Polyglot Validation Gate
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  security-fuzz-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Generate Mock Polyglot Payloads for Testing
+        run: |
+          mkdir -p tests/payloads
+          # Create a dummy image file that appends hidden script blocks in comments
+          echo -e "\xFF\xD8\xFF\xE0\x00\x10JFIF\x00.../*<script>alert(1)</script>*/" > tests/payloads/image_polyglot.jpg
+
+      - name: Run Infrastructure Stack and Fuzzing Matrix
+        run: |
+          docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from polyglot-fuzzer
+
+      - name: Teardown Testing Environments
+        if: always()
+        run: docker compose -f docker-compose.test.yml down -v
