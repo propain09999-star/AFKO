@@ -1,0 +1,149 @@
+import os
+import shutil
+import asyncio
+import logging
+import httpx
+import docker
+import git
+
+# Configure Local System Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] DeviantWorker-%(thread)d: %(message)s",
+    handlers=[logging.FileHandler("deviant_system.log"), logging.StreamHandler()]
+)
+
+class AsyncDeviantEngine:
+    def __init__(self, concurrency_limit=3, discord_url=None, tg_token=None, tg_chat_id=None):
+        self.semaphore = asyncio.Semaphore(concurrency_limit)
+        self.discord_url = discord_url
+        self.tg_token = tg_token
+        self.tg_chat_id = tg_chat_id
+        self.docker_client = docker.from_env()
+        
+        # Polyglot Execution Mapping
+        self.image_map = {
+            "python": "python:3.11-slim",
+            "go": "golang:1.22-alpine",
+            "javascript": "node:20-slim"
+        }
+
+    async def dispatch_alert(self, severity, repo_name, message):
+        """Dispatches non-blocking notifications to Telegram, Discord, and Logs."""
+        alert_body = f"[{severity.upper()}] Deviant Crawler Found Target\nRepo: {repo_name}\nDetails: {message}"
+        logging.info(alert_body)
+
+        async with httpx.AsyncClient() as client:
+            # Discord Dispatcher
+            if self.discord_url:
+                try:
+                    await client.post(self.discord_url, json={"content": f"```{alert_body}```"}, timeout=3.0)
+                except Exception as e:
+                    logging.error(f"Discord Alert Fail: {e}")
+
+            # Telegram Dispatcher
+            if self.tg_token and self.tg_chat_id:
+                try:
+                    tg_url = f"https://telegram.org{self.tg_token}/sendMessage"
+                    await client.post(tg_url, json={"chat_id": self.tg_chat_id, "text": alert_body}, timeout=3.0)
+                except Exception as e:
+                    logging.error(f"Telegram Alert Fail: {e}")
+
+    async def clean_storage_path(self, local_path):
+        """AUTOMATED CLEANUP SCHEDULE: Wipes directory files safely using an async thread loop."""
+        if os.path.exists(local_path):
+            try:
+                # Run the blocking file system operation inside a thread pool to preserve async performance
+                await asyncio.to_thread(shutil.rmtree, local_path)
+                logging.info(f"[*] Storage Sanitized: Successfully erased {local_path}")
+            except Exception as e:
+                logging.error(f"[-] Cleanup Failure for {local_path}: {e}")
+
+    async def execute_isolated_test(self, container, command):
+        """Executes verification routines inside the Docker Sandbox asynchronously."""
+        # Running docker-py exec_run inside a thread pool to avoid blocking the async event loop
+        def run_cmd():
+            return container.exec_run(cmd=f"sh -c '{command}'")
+        
+        result = await asyncio.to_thread(run_cmd)
+        return result.exit_code, result.output.decode('utf-8', errors='ignore')
+
+    async def deviant_worker_daemon(self, repo_url, language):
+        """
+        AUTONOMOUS DEVIANT WORKER: An independent task running concurrently inside the engine loop.
+        """
+        repo_name = repo_url.split("/")[-1].replace(".git", "")
+        local_path = os.path.abspath(f"./tmp/deviant_{repo_name}")
+        
+        # Enforce execution concurrency limits
+        async with self.semaphore:
+            await self.dispatch_alert("info", repo_name, f"Deviant worker locked onto target. Clones initiating.")
+            
+            try:
+                # 1. Asynchronous Clone Trigger
+                await asyncio.to_thread(git.Repo.clone_from, repo_url, local_path)
+                
+                # 2. Spin up Safe Sandboxed Container Environment
+                target_image = self.image_map.get(language, "ubuntu:latest")
+                def provision_container():
+                    return self.docker_client.containers.run(
+                        image=target_image,
+                        command="tail -f /dev/null",
+                        volumes={local_path: {'bind': '/app', 'mode': 'rw'}},
+                        detach=True,
+                        network_disabled=True,
+                        mem_limit="512m"
+                    )
+                
+                container = await asyncio.to_thread(provision_container)
+                
+                try:
+                    # 3. Compile / Upgrade Check Step
+                    build_cmds = {"python": "python3 -m py_compile /app/*.py", "go": "cd /app && go build ./..."}
+                    exit_code, output = await self.execute_isolated_test(container, build_cmds.get(language, "true"))
+                    
+                    if exit_code == 0:
+                        # 4. Search for usable modules or architecture upgrades
+                        # A production script would point to your Semgrep/AI logic here
+                        await self.dispatch_alert("success", repo_name, "Module build verified. Code structures cataloged for integration upgrades.")
+                    else:
+                        await self.dispatch_alert("warning", repo_name, f"Repository build failed verification criteria.")
+                        
+                finally:
+                    # 5. Safe Sandbox Destruction
+                    await asyncio.to_thread(container.stop)
+                    await asyncio.to_thread(container.remove)
+                    
+            except Exception as e:
+                await self.dispatch_alert("error", repo_name, f"Deviant pipeline error encountered: {str(e)}")
+                
+            finally:
+                # 6. AUTOMATED CLEANUP: Enforce drive space optimization immediately following job completion
+                await self.clean_storage_path(local_path)
+
+    async def run_pipeline_orchestration(self, target_queue):
+        """Coordinates and launches all concurrent worker loops simultaneously."""
+        tasks = []
+        for repo_url, lang in target_queue:
+            tasks.append(self.deviant_worker_daemon(repo_url, lang))
+        
+        # Gather execution threads and run in parallel batches
+        await asyncio.gather(*tasks)
+
+if __name__ == "__main__":
+    # Define a queue of multiple repos for the Deviant Crawlers to attack in parallel
+    crawling_queue = [
+        ("https://codeberg.org", "python"),
+        ("https://codeberg.org", "python"),
+    ]
+    
+    # Instantiate the system engine configuration parameters
+    engine = AsyncDeviantEngine(
+        concurrency_limit=2,
+        discord_url=None, # Insert live Discord webhook URL string
+        tg_token=None,    # Insert live Telegram bot token
+        tg_chat_id=None   # Insert target user/chat integer identifier
+    )
+    
+    # Initialize the asynchronous execution framework loop
+    asyncio.run(engine.run_pipeline_orchestration(crawling_queue))
