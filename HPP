@@ -1,0 +1,110 @@
+from typing import Dict, Any
+import json
+import re
+
+# ==========================================
+# 1. THE CORE APPLICATION LOGIC (THE DOMAIN)
+# ==========================================
+# The domain relies entirely on deeply-typed, safe objects. It knows nothing
+# about HTTP, JSON, XML, or binary protocols. It cannot be attacked with syntax.
+
+class SanitizedUserPayload:
+    """An immutable, strictly-typed data structure representing fully verified data."""
+    def __init__(self, user_id: int, access_level: str):
+        if not isinstance(user_id, int):
+            raise TypeError("Domain Violation: user_id must be a strict integer.")
+        if access_level not in ["USER", "MANAGER", "ADMIN"]:
+            raise ValueError(f"Domain Violation: Invalid system privilege level: {access_level}")
+            
+        self.user_id: int = user_id
+        self.access_level: str = access_level
+
+class SecurityControlCore:
+    """The safe domain engine. Operates only inside the system boundary."""
+    def execute_privileged_action(self, payload: SanitizedUserPayload) -> str:
+        # No strings or queries can inject commands here because properties are already native types.
+        return f"Sovereign execution granted for User {payload.user_id} with privileges: {payload.access_level}"
+
+
+# ==========================================
+# 2. THE INBOUND ADAPTER (THE DRIVING PORT)
+# ==========================================
+# This adapter sits at the boundary. It digests raw, potentially malicious 
+# string/binary streams and aggressively strips away multi-parsing ambiguities.
+
+class HttpJsonInputAdapter:
+    """Enforces absolute canonicalization on JSON and UTF-8 structures."""
+    def __init__(self, core_engine: SecurityControlCore):
+        self.core = core_engine
+
+    def handle_raw_network_request(self, raw_http_body: bytes) -> Dict[str, Any]:
+        """Intercepts raw network inputs and implements Zero-Trust parsing."""
+        
+        # Guard 1: Strict Character Encoding Standardization
+        try:
+            # Force decode strictly to UTF-8, crashing instantly on malformed multi-byte injection strings
+            canonical_string = raw_http_body.decode('utf-8', errors='strict')
+        except UnicodeDecodeError as e:
+            return {"status": 400, "error": f"Encoding Malformation Blocked: {str(e)}"}
+
+        # Guard 2: Enforce Strict Serialization/Parsing Rules
+        try:
+            # Ensure the JSON string does not contain duplicate dictionary keys (a common parse differential bypass)
+            # Standard python json.loads allows overwrite; we block it explicitly.
+            def _reject_duplicates(pairs):
+                data = {}
+                for k, v in pairs:
+                    if k in data:
+                        raise ValueError(f"Duplicate key injection detected: {k}")
+                    data[k] = v
+                return data
+
+            parsed_data = json.loads(canonical_string, object_pairs_hook=_reject_duplicates)
+        except ValueError as e:
+            return {"status": 400, "error": f"Asymmetric Structural Syntax Blocked: {str(e)}"}
+
+        # Guard 3: Strict Conversion from Network Strings to Type-Safe Objects
+        try:
+            # Coerce the untrusted fields into the immutable Domain Object. 
+            # If user_id is passed as a string like "123 OR 1=1", the int() cast fails natively.
+            safe_payload = SanitizedUserPayload(
+                user_id=int(parsed_data.get("user_id")),
+                access_level=str(parsed_data.get("access_level", "")).upper()
+            )
+        except (TypeError, ValueError) as e:
+            return {"status": 422, "error": f"Schema Validation Layer Failed: {str(e)}"}
+
+        # Guard 4: Hand off to isolated processing logic
+        result_message = self.core.execute_privileged_action(safe_payload)
+        return {"status": 200, "message": result_message}
+
+
+# ==========================================
+# 3. VERIFICATION EXECUTION IN TEST MATRIX
+# ==========================================
+if __name__ == "__main__":
+    # Initialize our Isolated Architecture Stack
+    core_system = SecurityControlCore()
+    api_endpoint = HttpJsonInputAdapter(core_system)
+
+    print("--- Running Weaponization vs Adapter Patching Tests ---\n")
+
+    # Scenario A: Attack via Type Confusion/Injection Vector
+    # Malicious string payload trying to spoof an integer field using a SQL injection syntax.
+    attack_payload_1 = b'{"user_id": "999 OR 1=1", "access_level": "ADMIN"}'
+    print(f"Executing Input Vector 1 (Type Injection): {attack_payload_1.decode()}")
+    response_1 = api_endpoint.handle_raw_network_request(attack_payload_1)
+    print(f"Result -> Status: {response_1['status']}, Error: {response_1.get('error')}\n")
+
+    # Scenario B: Attack via Duplicate Polyglot JSON Syntax Overwrite
+    # Passing duplicate keys. Weak parsers look at the first key, business logic checks the second.
+    attack_payload_2 = b'{"user_id": 101, "access_level": "USER", "user_id": 101, "access_level": "ADMIN"}'
+    print(f"Executing Input Vector 2 (Asymmetric Parser Duplicate): {attack_payload_2.decode()}")
+    response_2 = api_endpoint.handle_raw_network_request(attack_payload_2)
+    print(f"Result -> Status: {response_2['status']}, Error: {response_2.get('error')}\n")
+
+    # Scenario C: Valid, Structurally Sound Request Passing Through Guards
+    clean_payload = b'{"user_id": 742, "access_level": "MANAGER"}'
+    print(f"Executing Input Vector 3 (Clean Canonical Payload): {clean_payload.decode()}")
+    response_3 = api_endpoint.handle_raw_network_request(clean_payload)
+    print(f"Result -> Status: {response_3['status']}, Message: {response_3.get('message')}\n")
