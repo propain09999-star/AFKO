@@ -1,0 +1,101 @@
+# pip install langgraph pydantic
+from typing import Dict, Any, List
+from typing_extensions import TypedDict
+from langgraph.graph import StateGraph, END
+
+# Define the central, shared cognitive state layout (Python version of the DNA)
+class BrainState(TypedDict):
+    session_id: str
+    original_query: str
+    dominant_intent: str
+    target_api_nodes: List[str]
+    raw_payloads: List[Dict[str, Any]]
+    circuit_tripped: bool
+    error_log: str
+    final_synthesis: str
+
+# Node 1: Intent Analysis (Simulating handoff from Ruby)
+def limbic_parsing_node(state: BrainState) -> Dict[str, Any]:
+    print("--- Executive Brain: Parsing Core Intention ---")
+    query = state["original_query"].lower()
+    
+    # Python mirrors the Ruby DSL routing rules for internal redundancy
+    if "crypto" in query or "bitcoin" in query:
+        return {
+            "dominant_intent": "FINANCIAL_SYNTHESIS",
+            "target_api_nodes": ["BinancePublicTickerAPI", "CoinGeckoFreeTier"]
+        }
+    return {
+        "dominant_intent": "GENERAL_KNOWLEDGE_SEARCH",
+        "target_api_nodes": ["WikipediaTextExtractor"]
+    }
+
+# Node 2: Network Execution (Simulating handoff to Node.js & Rust Chaperone)
+def sensory_execution_node(state: BrainState) -> Dict[str, Any]:
+    print("--- Executive Brain: Driving Parallel API Gathering ---")
+    
+    # In full production, this triggers the Node.js sensory worker via gRPC/IPC
+    # If the Rust Amygdala detected a problem, state['circuit_tripped'] would be true
+    if state.get("circuit_tripped") or "poison_payload" in state["original_query"]:
+        return {
+            "circuit_tripped": True,
+            "error_log": "Amygdala Alert: Misfolded signature caught in raw API data stream."
+        }
+        
+    # Simulated validation response from successfully parsed binary data
+    mocked_valid_payloads = [{"source": "Binance", "data": '{"price": "95000.00"}'}]
+    return {"raw_payloads": mocked_valid_payloads, "circuit_tripped": False}
+
+# Node 3: Self-Correction Node
+def dynamic_self_correction_node(state: BrainState) -> Dict[str, Any]:
+    print("--- Executive Brain: Initiating Neural Self-Correction Loop ---")
+    # Mutates the target nodes to bypass failing synapses and try alternatives
+    return {
+        "target_api_nodes": ["WikipediaTextExtractor"], # Fallback choice
+        "circuit_tripped": False,
+        "error_log": "Resolved: Corrupted stream bypassed."
+    }
+
+# Node 4: Cognitive Generation Node
+def final_synthesis_node(state: BrainState) -> Dict[str, Any]:
+    print("--- Executive Brain: Fusing Structured Context to Output ---")
+    context = str(state["raw_payloads"])
+    # Standard LLM/RAG injection step
+    response = f"Synthesized answer for '{state['original_query']}' using fresh context: {context}"
+    return {"final_synthesis": response}
+
+# Conditional Routing Logic: The decision branches of the DAG
+def router_conditional_edge(state: BrainState) -> str:
+    if state.get("circuit_tripped"):
+        return "remedy_pathway"
+    return "synthesis_pathway"
+
+# --- Building the Physical Graph Network Architecture ---
+workflow = StateGraph(BrainState)
+
+# Define the operational nodes
+workflow.add_node("intent_analyzer", limbic_parsing_node)
+workflow.add_node("sensory_fetcher", sensory_execution_node)
+workflow.add_node("self_corrector", dynamic_self_correction_node)
+workflow.add_node("synthesizer", final_synthesis_node)
+
+# Connect the axonal lines
+workflow.set_entry_point("intent_analyzer")
+workflow.add_edge("intent_analyzer", "sensory_fetcher")
+
+# Dynamic branching based on Rust circuit-breaker feedback
+workflow.add_conditional_edges(
+    "sensory_fetcher",
+    router_conditional_edge,
+    {
+        "remedy_pathway": "self_corrector",
+        "synthesis_pathway": "synthesizer"
+    }
+)
+
+# Loop back up to try the fetch loop again after self-correction
+workflow.add_edge("self_corrector", "sensory_fetcher")
+workflow.add_edge("synthesizer", END)
+
+# Compile the final execution engine
+compiled_digital_brain = workflow.compile()
