@@ -1,0 +1,39 @@
+import numpy as np
+
+class BronEdgeEdgeNode:
+    def __init__(self, cached_vectors, cached_texts, fm_index_mock):
+        # The edge node holds a local cache of vectorized knowledge instead of files
+        self.vector_cache = cached_vectors  # Matrix of cached text vectors
+        self.text_cache = cached_texts      # Corresponding raw text segments
+        self.fm_index = fm_index_mock        # Sub-segmented fast string index
+        
+    def serve_request(self, user_intent_string, user_intent_vector):
+        """
+        Replaces CDN edge fetch. 
+        Processes the request semantically and returns text instead of heavy web files.
+        """
+        # 1. Calculate Semantic Alignment across the edge cache
+        scores = np.dot(self.vector_cache, user_intent_vector) / (
+            np.linalg.norm(self.vector_cache, axis=1) * np.linalg.norm(user_intent_vector) + 1e-9
+        )
+        best_match_idx = np.argmax(scores)
+        semantic_score = scores[best_match_idx]
+        
+        # 2. Check Verbatim Engine (FM-Index) for exact structural match
+        verbatim_score = 1.0 if user_intent_string.lower() in self.text_cache[best_match_idx].lower() else 0.0
+        
+        # 3. Bi-Harmonic Blending at the Edge
+        if semantic_score + verbatim_score == 0:
+            return "No aligned data found at this edge node."
+            
+        final_alignment = (2 * semantic_score * verbatim_score) / (semantic_score + verbatim_score)
+        
+        # If the data matches your intent threshold, stream the raw text, not the webpage files
+        if final_alignment > 0.5:
+            return {
+                "status": "200_SEMANTIC_HIT",
+                "payload_bytes": len(self.text_cache[best_match_idx]), # Extremely small (Kilobytes vs Megabytes)
+                "data": self.text_cache[best_match_idx]
+            }
+            
+        return {"status": "404_MISS", "action": "Trigger Distributed Targeted Spiders"}
