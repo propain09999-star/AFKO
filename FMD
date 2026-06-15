@@ -1,0 +1,1 @@
+pip install docker semgrep openai httpx GitPython
