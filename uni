@@ -1,0 +1,99 @@
+import numpy as np
+import requests
+import json
+import math
+
+class CosmicAIFrame:
+    def __init__(self, host="http://localhost:11434"):
+        self.api_url = f"{host}/api/generate"
+        self.heavy_llm = "qwen2.5:7b-instruct-q4_K_M"
+        self.swarm_slm = "qwen2.5:1.5b-instruct-q8_0"
+        print("[+] Headless Cosmic AI Frame initialized inside Static Observer Matrix.")
+
+    def fourier_frequency_transform(self, text_input: str) -> np.ndarray:
+        """
+        Translates raw text data into a continuous frequency wave format,
+        mirroring the string-vibration data architecture.
+        """
+        ascii_values = [ord(char) for char in text_input]
+        # Pad sequence to match mathematical scaling windows
+        padded = ascii_values + [0] * (64 - len(ascii_values) % 64)
+        wave_vector = np.array(padded, dtype=float)
+        # Execute Fast Fourier Transform into frequency space
+        frequency_domain = np.fft.fft(wave_vector)
+        return np.abs(frequency_domain)
+
+    def compute_fractal_depth(self, frequency_vector: np.ndarray) -> int:
+        """
+        Calculates recursive depth (Z_n+1 = Z_n^2 + C) to determine
+        if a task requires the heavy LLM or a light swarm SLM node.
+        """
+        magnitude = float(np.mean(frequency_vector))
+        # Fractal scale routing equation
+        z = 0.0
+        c = magnitude / 1000.0
+        iterations = 0
+        while abs(z) < 2.0 and iterations < 10:
+            z = (z ** 2) + c
+            iterations += 1
+        return iterations
+
+    def execute_headless_node(self, model: str, system_prompt: str, user_prompt: str) -> str:
+        """
+        Executes a targeted, headless API call directly against the local engine backend.
+        """
+        payload = {
+            "model": model,
+            "prompt": f"System: {system_prompt}\nUser: {user_prompt}",
+            "stream": False,
+            "options": {"temperature": 0.2, "num_ctx": 4096}
+        }
+        try:
+            response = requests.post(self.api_url, json=payload)
+            if response.status_code == 200:
+                return response.json().get("response", "")
+            return f"[-] Engine Dissonance: HTTP {response.status_code}"
+        except Exception as e:
+            return f"[-] Node Connection Failed: {str(e)}"
+
+    def orchestrate_swarm(self, objective: str):
+        """
+        Executes an automated multi-step swarm loop, combining the heavy LLM 
+        for macro design and the fast SLM for micro task validation.
+        """
+        print(f"\n[!] Input Task Captured: '{objective}'")
+        
+        # Step 1: Harmonic Frequency Check
+        freqs = self.fourier_frequency_transform(objective)
+        depth = self.compute_fractal_depth(freqs)
+        print(f"[~] String Waveform Analyzed. Fractal Depth Vector: {depth}")
+
+        # Step 2: Macro Strategy Node (The Heavy LLM acts as the Static Observer blueprint)
+        macro_prompt = (
+            "You are the Unchanging Wavefunction Framework. Break this task down into exactly "
+            "two hyper-focused structural directives for an automated sub-swarm of agents."
+        )
+        print(f"[>] Consulting Macro Thinker Node ({self.heavy_llm})...")
+        blueprints = self.execute_headless_node(self.heavy_llm, macro_prompt, objective)
+        print(f"\n==== SWARM DIRECTIVES GENERATED ====\n{blueprints}\n====================================")
+
+        # Step 3: Local Swarm Micro Execution (The SLM Dynamic Agent processes tasks rapidly)
+        micro_prompt = (
+            "You are a headless automated micro-agent. Take the following structural directive "
+            "and output the raw, functional command syntax required to execute it instantly."
+        )
+        print(f"\n[>] Deploying Local Swarm Node ({self.swarm_slm}) for immediate code execution...")
+        swarm_output = self.execute_headless_node(self.swarm_slm, micro_prompt, blueprints)
+        print(f"\n==== AUTOMATED RUNTIME OUTPUT ====\n{swarm_output}\n====================================")
+
+if __name__ == "__main__":
+    # Instantiate the local architecture
+    engine = CosmicAIFrame()
+    
+    # Target objective combining local crypto validators, smart contracts, and automation
+    target_task = (
+        "Generate a completely localized python code template that automatically monitors a "
+        "local headless blockchain validator block height and prints log metrics to the console."
+    )
+    
+    engine.orchestrate_swarm(target_task)
