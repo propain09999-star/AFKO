@@ -1,0 +1,2 @@
+chmod +x system_control.sh
+./system_control.sh
