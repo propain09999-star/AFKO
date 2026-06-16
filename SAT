@@ -1,0 +1,11 @@
+cat << 'EOF' > ~/.termux/boot/start_cosmic_core.sh
+#!/bin/bash
+# Prevent Android from putting the headless terminal processor to sleep
+termux-wake-lock
+
+# Initialize native local directory pathways
+cd /data/data/com.termux/files/home
+
+# Execute your master unified Polyglot tool chain headlessly in the background
+nohup ./system_control.sh > cosmic_runtime.log 2>&1 &
+EOF
