@@ -1,0 +1,43 @@
+# Add this import to the top of your python block in system_control.sh
+import json
+
+# Update the engage_orchestration_cycle function inside system_control.sh:
+def engage_orchestration_cycle(self):
+    print(f"[+] Static Matrix Operational State Verified: {self.unchanging_equation}")
+    
+    # NEW STEP: Run the Complexity Governor first
+    self.run_sub_module("cosmic_complexity.py")
+    
+    # Read the complexity rules written by the governor
+    delay_multiplier = 1.0
+    if os.path.exists("complexity_state.json"):
+        with open("complexity_state.json", "r") as f:
+            rules = json.load(f)
+            delay_multiplier = rules.get("execution_delay_multiplier", 1.0)
+            if rules.get("governor_mode") == "DISSONANCE_THROTTLE":
+                print("[💥] System is running heavy. Skipping non-essential modules to preserve device memory...")
+    
+    # Step 1: Enforce hardware safety parameters
+    self.run_sub_module("cosmic_failsafe.py")
+    
+    # Step 2: Sample local hardware metrics and log diagnostic data
+    self.run_sub_module("sys_monitor.py")
+    
+    # If the complexity governor tells us to throttle, we skip heavy AI/Crypto tasks on this loop pass
+    if delay_multiplier <= 1.0:
+        self.run_sub_module("cosmic_data.py")
+        self.run_sub_module("cosmic_engine.py")
+        self.run_sub_module("cosmic_quantum.py")
+        self.run_sub_module("cosmic_crypto.py")
+        self.run_sub_module("cosmic_vault.py")
+    
+    # Step 3: Run the web3 validation operations
+    self.run_sub_module("cosmic_failover.py")
+    self.run_sub_module("cosmic_web3.py")
+    self.run_sub_module("cosmic_contracts.py")
+    self.run_sub_module("cosmic_notifier.py")
+    self.run_sub_module("cosmic_signer.py")
+    
+    # Step 4: Update the global diagnostics status dashboard
+    self.run_sub_module("cosmic_dashboard.py")
+    print("\n[🏆] Master Ecosystem Orchestration Loop Completed Under Stable State Constraints.")
