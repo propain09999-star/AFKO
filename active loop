@@ -1,0 +1,5 @@
+# 1. Start the system monitor daemon script to capture device health
+python3 sys_monitor.py
+
+# 2. Fire up the master unified engine script to process the task layers
+python3 cosmic_engine.py
