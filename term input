@@ -1,0 +1,5 @@
+# 1. Grant system execution permissions to your new Polyglot engine script
+chmod +x system_control.sh
+
+# 2. Boot the cluster headlessly
+./system_control.sh
