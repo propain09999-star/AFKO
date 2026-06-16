@@ -1,0 +1,66 @@
+import time
+import requests
+from web3 import Web3
+
+class NetworkFailoverMatrix:
+    def __init__(self):
+        # A list of public, independent Sepolia Testnet endpoints to cycle through
+        self.rpc_pool = [
+            "https://ankr.com",
+            "https://publicnode.com",
+            "https://1rpc.io",
+            "https://tenderly.co"
+        ]
+        self.current_index = 0
+        self.w3 = self.bind_to_active_node()
+
+    def bind_to_active_node(self) -> Web3:
+        """Attempts to establish connection with the current target pool index."""
+        target_rpc = self.rpc_pool[self.current_index]
+        print(f"[>] Testing communication loop with Node: {target_rpc}")
+        
+        w3_instance = Web3(Web3.HTTPProvider(target_rpc, request_kwargs={'timeout': 5}))
+        
+        try:
+            if w3_instance.is_connected():
+                print(f"[+] Active Connection Secured via Node #{self.current_index}")
+                return w3_instance
+        except Exception:
+            pass
+            
+        print(f"[-] Node #{self.current_index} failed to respond. Initiating failover...")
+        return self.trigger_rotation(w3_instance)
+
+    def trigger_rotation(self, failing_instance) -> Web3:
+        """Rotates through the endpoint pool recursively until a stable mesh node responds."""
+        attempts = 0
+        while attempts < len(self.rpc_pool):
+            self.current_index = (self.current_index + 1) % len(self.rpc_pool)
+            target_rpc = self.rpc_pool[self.current_index]
+            print(f"[!] Rotating to Fallback Array Index #{self.current_index}: {target_rpc}")
+            
+            w3_instance = Web3(Web3.HTTPProvider(target_rpc, request_kwargs={'timeout': 5}))
+            try:
+                if w3_instance.is_connected():
+                    print(f"[🏆] Connection re-established at node matrix position #{self.current_index}")
+                    return w3_instance
+            except Exception:
+                pass
+            attempts += 1
+            
+        print("[-] Critical Failure: All localized pool endpoints are unreachable.")
+        return failing_instance
+
+    def verify_network_health(self) -> Web3:
+        """A heartbeat check that can be called before executing transactions."""
+        try:
+            if not self.w3.is_connected():
+                self.w3 = self.bind_to_active_node()
+        except Exception:
+            self.w3 = self.bind_to_active_node()
+        return self.w3
+
+if __name__ == "__main__":
+    failover_system = NetworkFailoverMatrix()
+    # Execute a heartbeat logic test loop
+    failover_system.verify_network_health()
