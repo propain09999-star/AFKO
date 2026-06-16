@@ -1,0 +1,101 @@
+import numpy as np
+import requests
+import json
+import os
+import sys
+
+class ProductionCosmicEngine:
+    def __init__(self, host="http://localhost:11434"):
+        self.api_url = f"{host}/api/generate"
+        self.heavy_llm = "qwen2.5:7b-instruct-q4_K_M"
+        self.swarm_slm = "qwen2.5:1.5b-instruct-q8_0"
+        self.vitals_file = "system_vitals.json"
+        print("[+] Unified Production Cosmic Engine Awakened.")
+
+    def text_to_harmonic_frequencies(self, data_stream: str) -> np.ndarray:
+        """
+        Transforms input strings into a dimensional wave frequency array via a Fourier Sieve.
+        """
+        ascii_map = [ord(char) for char in data_stream]
+        # Pad up to 128 bit block sizes
+        padded_map = ascii_map + [0] * (128 - len(ascii_map) % 128)
+        wave_matrix = np.array(padded_map, dtype=float)
+        return np.abs(np.fft.fft(wave_matrix))
+
+    def calculate_fractal_dimension(self, wave_array: np.ndarray) -> int:
+        """
+        Determines execution resource routing depth via recursive Mandelbrot iteration bounds.
+        """
+        mean_vibe = float(np.mean(wave_array))
+        z, c = 0.0, mean_vibe / 500.0
+        depth = 0
+        while abs(z) < 2.0 and depth < 12:
+            z = (z ** 2) + c
+            depth += 1
+        return depth
+
+    def read_system_vitals(self) -> str:
+        """
+        Imports system diagnostics from the background daemon monitor file.
+        """
+        if os.path.exists(self.vitals_file):
+            with open(self.vitals_file, "r") as f:
+                metrics = json.load(f)
+            return (f"Hardware Context -> RAM Free: {metrics['ram_free_mb']}MB, "
+                    f"Storage Free: {metrics['storage_free_gb']}GB.")
+        return "Hardware Context -> Static configuration mode active."
+
+    def execute_headless_node(self, model: str, context: str, user_prompt: str) -> str:
+        """
+        Pipes raw payload configurations directly to the headless Ollama model endpoint.
+        """
+        payload = {
+            "model": model,
+            "prompt": f"System/Hardware Envelope: {context}\nTask Target: {user_prompt}",
+            "stream": False,
+            "options": {"temperature": 0.15, "num_ctx": 4096}
+        }
+        try:
+            res = requests.post(self.api_url, json=payload, timeout=90)
+            if res.status_code == 200:
+                return res.json().get("response", "")
+            return f"[-] Blocked by Engine State Error Code {res.status_code}"
+        except Exception as e:
+            return f"[-] Local Node Pipeline Offline: {str(e)}"
+
+    def initiate_swarm_sequence(self, objective: str):
+        """
+        Orchestrates full cross-model logic generation using the complete hardware envelope.
+        """
+        vitals = self.read_system_vitals()
+        wave = self.text_to_harmonic_frequencies(objective)
+        fractal_depth = self.calculate_fractal_dimension(wave)
+        
+        print(f"\n[~] Wave Harmonics Generated. Fractal Routing Vectors Matched to Depth: {fractal_depth}")
+        print(f"[~] Siphoned {vitals}")
+
+        # The Heavy Model acts as the Static Observer (Macro Directive Engine)
+        observer_prompt = (
+            "You are the Unchanging Wavefunction Observer. Break this task into exactly "
+            "two high-level, clear technical directives optimized for an automated headless script."
+        )
+        print(f"[>] Sending payload to Static Observer Node ({self.heavy_llm})...")
+        macro_blueprint = self.execute_headless_node(self.heavy_llm, vitals, objective)
+        print(f"\n==== MACRO OBSERVATION DIRECTIVES ====\n{macro_blueprint}\n======================================")
+
+        # The Small Model acts as the Active Agent (Micro Processing Engine)
+        agent_prompt = (
+            "You are a local automated micro-agent running headlessly. Take the provided structural directive "
+            "and output the functional Python syntax to execute it."
+        )
+        print(f"\n[>] Routing blueprints to Dynamic Agent Swarm Node ({self.swarm_slm})...")
+        micro_execution = self.execute_headless_node(self.swarm_slm, vitals, macro_blueprint)
+        print(f"\n==== EXECUTABLE RUNTIME ARCHITECTURE ====\n{micro_execution}\n=========================================")
+
+if __name__ == "__main__":
+    engine = ProductionCosmicEngine()
+    objective_task = (
+        "Draft a secure communication framework that logs transaction hashes to an "
+        "automated decentralized state container while respecting constrained system memory profiles."
+    )
+    engine.initiate_swarm_sequence(objective_task)
