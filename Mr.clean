@@ -1,0 +1,48 @@
+import os
+import glob
+import json
+import shutil
+
+class StorageProtectionUtility:
+    def __init__(self, max_storage_usage_pct=85.0):
+        self.max_pct = max_storage_usage_pct
+        self.critical_log_targets = ["*.log", "*.json", "emergency_halt.flag"]
+        # Skip critical system state tracking profiles
+        self.exclusions = ["local_fractal_db.json", "complexity_state.json", "secured_vault.enc", "cosmic_dashboard_view.json"]
+
+    def evaluate_storage_bounds(self) -> bool:
+        """Checks if the device storage has crossed the safety threshold."""
+        total, used, free = shutil.disk_usage("/")
+        current_usage_pct = (used / total) * 100
+        print(f"[~] Storage Protection Check: {current_usage_pct:.2f}% Capacity Utilized.")
+        return current_usage_pct > self.max_pct
+
+    def execute_purge_matrix(self):
+        """Purges stale data blocks if the storage threshold is breached."""
+        if not self.evaluate_storage_bounds():
+            print("[+] Storage volumes well within safe bounds. Purge sequence bypassed.")
+            return
+
+        print("[🚨] STORAGE CAPACITY THRESHOLD BREACHED. INITIALIZING DATA PURGE MATRIX...")
+        
+        # Iterate over log and temporary file extensions
+        for pattern in self.critical_log_targets:
+            for file_path in glob.glob(pattern):
+                filename = os.path.basename(file_path)
+                
+                # Enforce protection exclusions
+                if filename in self.exclusions:
+                    continue
+                    
+                try:
+                    file_size = os.path.getsize(file_path)
+                    os.remove(file_path)
+                    print(f"[-] Deflated stale buffer file: {filename} ({file_size} bytes reclaimed)")
+                except Exception as e:
+                    print(f"[-] Failed to clear {filename}: {str(e)}")
+                    
+        print("[🏆] Storage optimization sweep completed.")
+
+if __name__ == "__main__":
+    cleaner = StorageProtectionUtility()
+    cleaner.execute_purge_matrix()
