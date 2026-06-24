@@ -1,0 +1,2 @@
+echo 'GITHUB_TOKEN="your_private_github_token_here"' > ~/YOUR_REPOSITORY_NAME/.env
+echo 'GOOGLE_DRIVE_API_KEY="your_google_drive_key_here"' >> ~/YOUR_REPOSITORY_NAME/.env
