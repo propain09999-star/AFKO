@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package chameleon;
+
+// Service to coordinate distributed zero-ontology computing steps
+service ChameleonNodeManager {
+  rpc AlignQuantumVector (StreamVectorRequest) returns (CoherenceResponse);
+}
+
+message StreamVectorRequest {
+  uint64_t master_state_n = 1;
+  uint32 current_temperature = 2;
+  uint32 node_hardware_level = 3;
+}
+
+message CoherenceResponse {
+  enum SystemStatus {
+    COHERENT = 0;
+    RECOVERING = 1;
+    HALTED = 2;
+  }
+  SystemStatus status = 1;
+  uint64 mutated_state_n = 2;
+  string tracking_log = 3;
+}
