@@ -1,0 +1,59 @@
+import subprocess
+import random
+import sys
+
+def generate_malicious_stream(length, junk_ratio=0.85):
+    """
+    Constructs a heavily corrupted sequence to trigger continuous
+    Fraction 4 structural recovery loops and force overflow scenarios.
+    """
+    bases = ['A', 'T', 'C', 'G']
+    stream = []
+    for _ in range(length):
+        if random.random() < junk_ratio:
+            stream.append('N')  # Inject Branchless Null-Bypass Noise
+        else:
+            stream.append(random.choice(bases))
+    return "".join(stream)
+
+def execute_stress_run():
+    print("=== [STRESS TEST] Initializing Boundary Attack Vector ===")
+    
+    # Generate 5,000 bases of severe structural noise
+    attack_sequence = generate_malicious_stream(length=5000, junk_ratio=0.90)
+    
+    # Commit the attack vector to the file pipeline target
+    with open("target_sequence.txt", "w") as f:
+        f.write(attack_sequence)
+        
+    print(f"Malicious stream successfully deployed to target_sequence.txt.")
+    print("Launching FRACTRAN engine to audit safety bounds...")
+
+    # Execute compiled CUDA infrastructure via subprocess tracking
+    try:
+        result = subprocess.run(
+            ["./fractran_engine", "target_sequence.txt"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        output = result.stdout
+        print("\n=== [ENGINE TERMINAL OUTPUT SUMMARY] ===")
+        print(output)
+        
+        # Audit output traces for integer overflow anomalies
+        if "Final Stable State Vector N': 0" in output:
+            print("❌ FAILURE DETECTED: Integer overflow occurred. State collapsed to zero.")
+            sys.exit(1)
+        elif "Final Stable State Vector N':" in output:
+            print("✅ SUCCESS: Bit-Length Multiplier Guards held memory boundaries securely.")
+        else:
+            print("⚠️ WARNING: Unexpected execution trace generated. Verify kernel loops.")
+            
+    except subprocess.CalledProcessError as e:
+        print(f"❌ CRITICAL INFRASTRUCTURE CRASH: {e.stderr}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    execute_stress_run()
