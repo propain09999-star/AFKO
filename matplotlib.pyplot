@@ -1,0 +1,63 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+
+# Initialize 120 Stable Orbifold Nodes
+nodes_x, nodes_y = [], []
+for p in range(10):
+    for q in range(12):
+        nodes_x.append(11 * p + 1)
+        nodes_y.append(169 * q + 1)
+
+fig, ax = plt.subplots(figsize=(10, 6), facecolor='#0d1117')
+ax.set_facecolor('#0d1117')
+
+# Plot background structural grid nodes
+ax.scatter(nodes_x, nodes_y, color='#58a6ff', alpha=0.15, s=30, label='Orbifold Core Nodes')
+
+# Setup data point representations
+coherent_history_dots = ax.scatter([], [], color='#39d353', s=60, label='Decoherence in Coherent History')
+decoherent_instance_dots = ax.scatter([], [], color='#f85149', s=80, marker='x', label='Coherent Point in Decoherent Instances')
+path_line, = ax.plot([], [], color='#2188ff', linestyle=':', alpha=0.6, linewidth=1.5)
+
+ax.set_title('Autonomous Agency: Multi-Pathway Coherence Tracker', color='white', fontsize=12)
+ax.set_xlim(-10, 120)
+ax.set_ylim(-100, 2300)
+ax.tick_params(colors='white')
+ax.grid(color='#21262d', linestyle=':', alpha=0.3)
+ax.legend(facecolor='#161b22', edgecolor='#30363d', labelcolor='white', loc='upper right')
+
+# Simulated dynamic traffic data
+history_x, history_y = [], []
+
+def update_mesh_telemetry(frame):
+    global history_x, history_y
+    
+    # Simulate a broad, stable macro trajectory (Coherent History)
+    p_base = (frame // 5) % 10
+    q_base = (frame // 3) % 12
+    hx = 11 * p_base + 1 + np.random.normal(0, 1.5) # Adding minor local decoherence noise
+    hy = 169 * q_base + 1 + np.random.normal(0, 15)
+    
+    coherent_history_dots.set_offsets(np.array([[hx, hy]]))
+    
+    # Simulate an isolated, highly precise phase lock inside a noisy field
+    if frame % 7 == 0:
+        # Snaps perfectly to node (4, 5) without any boundary drift
+        dx, dy = 11 * 4 + 1, 169 * 5 + 1
+        decoherent_instance_dots.set_offsets(np.array([[dx, dy]]))
+    else:
+        decoherent_instance_dots.set_offsets(np.empty((0, 2)))
+        
+    # Maintain global system trace line
+    history_x.append(hx)
+    history_y.append(hy)
+    if len(history_x) > 20:
+        history_x.pop(0)
+        history_y.pop(0)
+    path_line.set_data(history_x, history_y)
+    
+    return coherent_history_dots, decoherent_instance_dots, path_line
+
+ani = animation.FuncAnimation(fig, update_mesh_telemetry, frames=200, interval=100, blit=True)
+plt.show()
