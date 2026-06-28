@@ -1,0 +1,31 @@
+# ==============================================================================
+# PLCT ARCHITECTURE SYSTEM CONTAINER
+# ==============================================================================
+FROM nvidia/cuda:12.6.0-devel-ubuntu24.04
+
+# Prevent interactive prompts during software package provisioning
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Update underlying software vectors and pull system requirements
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    python3-pip \
+    python3-dev \
+    python3-numpy \
+    python3-matplotlib \
+    libnvidia-ml-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up dedicated operational directory space
+WORKDIR /workspace
+
+# Transfer local algorithmic pipelines into the secure build environment
+COPY . /workspace
+
+# Compile the high-velocity execution hardware wrapper
+# Linking directly to native nvml libraries for live thermal tuning
+RUN nvcc -O3 -lnvidia-ml fractran_kernel.cu -o fractran_engine
+
+# Establish runtime entrypoint for automated execution sweeps
+ENTRYPOINT ["/bin/bash", "deploy_plct.sh"]
