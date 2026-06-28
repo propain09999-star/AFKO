@@ -1,0 +1,5 @@
+// Fast bit-length evaluation to prevent register overflow
+__device__ __forceinline__ bool safe_to_multiply(uint64_t current, uint64_t factor) {
+    // Uses hardware-accelerated leading-zero counts to check capacity instantly
+    return __clzll(current) + __clzll(factor) >= 64;
+}
