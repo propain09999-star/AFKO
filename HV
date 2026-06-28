@@ -1,0 +1,62 @@
+#include <iostream>
+#include <vector>
+#include <cmath>
+#include <stdint.h>
+
+class PadicMemoryPool {
+private:
+    uint8_t* pool_backing_buffer;
+    size_t pool_total_capacity;
+    uint32_t allocation_stride;
+    uint32_t prime_metric;
+
+    // Evaluates the p-adic valuation (v_p): Highest exponent of p dividing the state delta
+    uint32_t calculate_padic_valuation(int64_t delta) {
+        if (delta == 0) return 32; // Boundary ceiling for 32-bit tracking
+        uint32_t valuation = 0;
+        while (delta % prime_metric == 0) {
+            valuation++;
+            delta /= prime_metric;
+        }
+        return valuation;
+    }
+
+public:
+    PadicMemoryPool(size_t capacity, uint32_t stride, uint32_t prime) 
+        : pool_total_capacity(capacity), allocation_stride(stride), prime_metric(prime) {
+        // Allocate continuous physical block to maximize VRAM or RAM cache locality
+        pool_backing_buffer = new uint8_t[pool_total_capacity];
+    }
+
+    ~PadicMemoryPool() { delete[] pool_backing_buffer; }
+
+    // Maps a state arithmetically to a pool address based on its p-adic proximity to a reference node
+    uint8_t* allocate_by_padic_metric(int64_t new_state, int64_t reference_node) {
+        int64_t state_delta = new_state - reference_node;
+        uint32_t v_p = calculate_padic_valuation(state_delta);
+        
+        // p-adic norm: ||delta||_p = p^(-v_p). Higher valuation means tighter physical proximity
+        // Map the valuation directly to a local memory slot offset
+        size_t slot_index = (32 - v_p) % (pool_total_capacity / allocation_stride);
+        size_t byte_offset = slot_index * allocation_stride;
+
+        std::cout << "[p-ADIC ALLOCATOR] State Delta: " << state_delta 
+                  << " | Valuation v_" << prime_metric << ": " << v_p 
+                  << " | Assigning Address Offset: +" << byte_offset << " bytes" << std::endl;
+
+        return &pool_backing_buffer[byte_offset];
+    }
+};
+
+int main() {
+    // Instantiate pool using p=3 structural sequence prime metric
+    PadicMemoryPool padic_pool(1024 * 1024, 64, 3);
+
+    int64_t baseline_node = 141800;
+    
+    // Test allocations using varying p-adic distances
+    uint8_t* addr1 = padic_pool.allocate_by_padic_metric(141827, baseline_node); // Delta = 27 (3³)
+    uint8_t* addr2 = padic_pool.allocate_by_padic_metric(141801, baseline_node); // Delta = 1  (3⁰)
+
+    return 0;
+}
