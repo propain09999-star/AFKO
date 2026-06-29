@@ -1,0 +1,43 @@
+# ==============================================================================
+# SECURE CI/CD PIPELINE: TOR ROUTING AND ZENO SYSTEM INITIALIZATION
+# ==============================================================================
+name: Tor Mesh & Zeno Security Integration Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  secure-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Pull Global Code Repositories
+      uses: actions/checkout@v4
+
+    - name: Initialize Tor Network Proxies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y tor aarch64-linux-gnu-g++ python3-numpy
+        # Start Tor locally as a background service proxy
+        sudo service tor start
+        sleep 3 # Give proxy circuits time to stabilize
+
+    - name: Compile ARM64 Native Code Core
+      run: |
+        aarch64-linux-gnu-g++ -O3 -march=armv8-a+crypto -ffast-math \
+          -fomit-frame-pointer -funroll-loops -DARM_OPTIMIZED \
+          src/core/mobile_engine.cpp -o mobile_fractran_engine_arm64
+
+    - name: Construct Zeno Folder Cryptographic Architecture
+      run: |
+        echo "Building nested Zeno directory loops using Mod-9 Ouroboros roots..."
+        python3 zeno_locker.py
+
+    - name: Encapsulate and Secure Production Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: secure-tor-zeno-arm64-package
+        path: |
+          mobile_fractran_engine_arm64
+          .zeno_horizon/
