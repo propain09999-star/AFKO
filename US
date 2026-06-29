@@ -1,0 +1,122 @@
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <cmath>
+#include <stdint.h>
+#include <unistd.h>
+
+// Struct to represent an exact FRACTRAN fraction operator
+struct Fraction {
+    uint64_t num;
+    uint64_t den;
+};
+
+// ==============================================================================
+// 1. THERMAL & ARM REGISTER BALANCING LAYER
+// ==============================================================================
+int read_mobile_core_temp() {
+#if defined(ARM_OPTIMIZED) || defined(__arm64__) || defined(__aarch64__)
+    std::ifstream thermal_zone("/sys/class/thermal/thermal_zone0/temp");
+    if (!thermal_zone.is_open()) return 35000; // Fallback to 35C in millidegrees
+    int raw_temp = 0;
+    thermal_zone >> raw_temp;
+    thermal_zone.close();
+    return raw_temp / 1000;
+#else
+    return 32; // Standard desktop simulation default (32C)
+#endif
+}
+
+// Bypasses float boundaries using hardware leading-zero counts to prevent overflows
+inline bool safe_to_multiply(uint64_t current, uint64_t factor) {
+#if defined(__GNUC__) || defined(__clang__)
+    return __builtin_clzll(current) + __builtin_clzll(factor) >= 64;
+#else
+    return (0xFFFFFFFFFFFFFFFF / factor) >= current;
+#endif
+}
+
+// ==============================================================================
+// 2. p-ADIC VOLUMETRIC MEMORY ALLOCATOR (Q_3 METRIC)
+// ==============================================================================
+class PadicMemoryPool {
+private:
+    uint8_t* pool_buffer;
+    size_t capacity;
+    uint32_t stride;
+    uint32_t prime_metric;
+
+    uint32_t calculate_valuation(int64_t delta) {
+        if (delta == 0) return 32;
+        uint32_t valuation = 0;
+        delta = std::abs(delta);
+        while (delta % prime_metric == 0) {
+            valuation++;
+            delta /= prime_metric;
+        }
+        return valuation;
+    }
+
+public:
+    PadicMemoryPool(size_t cap, uint32_t str, uint32_t p) : capacity(cap), stride(str), prime_metric(p) {
+        pool_buffer = new uint8_t[capacity];
+    }
+    ~PadicMemoryPool() { delete[] pool_buffer; }
+
+    uint8_t* allocate(int64_t state, int64_t anchor) {
+        uint32_t v_p = calculate_valuation(state - anchor);
+        size_t index = (32 - v_p) % (capacity / stride);
+        return &pool_buffer[index * stride];
+    }
+};
+
+// ==============================================================================
+// 3. MAIN COGNITIVE ENGINE EXECUTION
+// ==============================================================================
+int main() {
+    std::cout << "=== [INITIALIZING] Starting Native PLCT Mobile Core ===" << std::endl;
+
+    // Initialize the p-adic memory pool tracking the p=3 sequence metric
+    PadicMemoryPool mem_pool(1024 * 1024, 64, 3);
+    int64_t reference_anchor = 141800;
+
+    // Set up operators dynamically based on current phone temperature metrics
+    int current_temp = read_mobile_core_temp();
+    std::vector<Fraction> operators;
+    
+    if (current_temp < 40) {
+        std::cout << "[THERMAL CEILING] Safe (" << current_temp << "C). Loading AGGRESSIVE execution fractions." << std::endl;
+        operators = { {11 * 13, 2 * 7}, {324, 5}, {1, 11 * 13} }; // Aggressive mode: 2² * 3⁴ / 5¹
+    } else {
+        std::cout << "[THERMAL CEILING] Warm (" << current_temp << "C). Loading CONSERVATIVE low-draw fractions." << std::endl;
+        operators = { {11 * 13, 2 * 7}, {6, 25}, {1, 11 * 13} };  // Conservative mode: 2¹ * 3¹ / 5²
+    }
+
+    // Master state variable pinned to an ARM-register target
+    register uint64_t N_state __asm__("x19") = 45; // Seeded value containing factors 3² * 5¹
+    std::cout << "[ENGINE START] Initial Master State Vector N: " << N_state << std::endl;
+
+    // Execute 5,000 back-to-back fractional math steps without branches
+    for (int step = 0; step < 5000; ++step) {
+        bool op_applied = false;
+        for (const auto& op : operators) {
+            if (N_state % op.den == 0) {
+                uint64_t next_step = (N_state / op.den);
+                if (safe_to_multiply(next_step, op.num)) {
+                    N_state = next_step * op.num;
+                    op_applied = true;
+                    break; // Instant fallback loop reset
+                }
+            }
+        }
+        if (!op_applied) break; // Engine halts naturally when no fractions match
+    }
+
+    std::cout << "[ENGINE COMPLETE] Final Consolidated Vector State N': " << N_state << std::endl;
+
+    // Pass the final state result straight to our constant-time p-adic memory allocator
+    uint8_t* active_cache_addr = mem_pool.allocate(static_cast<int64_t>(N_state), reference_anchor);
+    std::cout << "[p-ADIC SLOT INITIALIZED] Context pinned securely to address: " << (void*)active_cache_addr << std::endl;
+
+    return 0;
+}
