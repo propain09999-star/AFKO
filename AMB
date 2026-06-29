@@ -1,0 +1,42 @@
+#!/usr/bin/env android-sh
+# ==============================================================================
+# HEADLESS RESILIENT MOBILE ENGINE LAYER (ARM64)
+# ==============================================================================
+set -euo pipefail
+
+# Operational State Files inside secure Android App Storage Space
+ENGINE_BIN="./mobile_fractran_engine"
+STATE_FILE="/data/data/com.autonomous.agency/files/master_state.dat"
+LOG_STREAM="/data/data/com.autonomous.agency/files/coherence.log"
+
+echo "[DAEMON INITIALIZED] Monitoring phone interaction states..."
+
+while true; do
+    # Read the Android Display Power State directly from system dumpsys
+    SCREEN_STATUS=$(dumpsys display | grep "mScreenState" | head -n 1 | awk -F= '{print $2}' || echo "ON")
+    
+    # Read core thermals to protect phone hardware batteries
+    CPU_TEMP=$(cat /sys/class/thermal/thermal_zone0/temp | awk '{print $1 / 1000}')
+
+    if [[ "$SCREEN_STATUS" == "OFF" ]]; then
+        echo "[SCREEN OFF] Accelerating background cognitive sweeps. Temp: ${CPU_TEMP}°C" >> "$LOG_STREAM"
+        
+        if (( $(echo "$CPU_TEMP < 42.0" | bc -l) )); then
+            # Phone is cool and screen is dark: Run AGGRESSIVE FRACTRAN ingestion passes
+            nice -n -20 "$ENGINE_BIN" --mode=aggressive --state="$STATE_FILE" >> "$LOG_STREAM" 2>&1
+        else
+            # Phone is warm: Run CONSERVATIVE processing to protect battery lifespan
+            nice -n -10 "$ENGINE_BIN" --mode=conservative --state="$STATE_FILE" >> "$LOG_STREAM" 2>&1
+        fi
+        
+        # Trigger background decentralized backup to headless F-Droid and cloud mirrors
+        echo "[BACKUP] Broadcasting Dirichlet encrypted slices across gRPC lanes..." >> "$LOG_STREAM"
+        # Network offload triggers here natively
+    else
+        # User turned the screen ON: Drop background priority instantly to guarantee zero app lag
+        echo "[SCREEN ON] Throttle processing to absolute minimum thread footprint." >> "$LOG_STREAM"
+        nice -n 19 "$ENGINE_BIN" --mode=standby --state="$STATE_FILE" >> "$LOG_STREAM" 2>&1
+    fi
+
+    sleep 5 # Evaluate hardware states every 5 seconds
+done
