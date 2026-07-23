@@ -1,11 +1,16 @@
 import os
 import git
 import httpx
-from github import Github
+
+from github_auth import get_github_client
 
 # Initialize configurations
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "your_github_token_here")
-g = Github(GITHUB_TOKEN)
+try:
+    g = get_github_client()
+except RuntimeError as exc:
+    print(f"[-] GitHub auth error: {exc}")
+    g = get_github_client(token=None)
+
 
 def crawl_target_repositories(language="python", query_limit=5):
     """

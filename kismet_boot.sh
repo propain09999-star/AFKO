@@ -19,8 +19,8 @@ else
 fi
 
 # 3. Define target GitHub path tracking arrays
-export GITHUB_REPO_URL="git@github.com:YOUR_GITHUB_USERNAME/YOUR_REPOSITORY_NAME.git"
-export REPO_DIR_NAME="YOUR_REPOSITORY_NAME"
+export GITHUB_REPO_URL="${GITHUB_REPO_URL:-git@github.com:YOUR_GITHUB_USERNAME/YOUR_REPOSITORY_NAME.git}"
+export REPO_DIR_NAME="${REPO_DIR_NAME:-YOUR_REPOSITORY_NAME}"
 
 # 4. Synchronize multi-extension repository codebase data streams
 if [ ! -d "$REPO_DIR_NAME" ]; then
