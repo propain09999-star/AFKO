@@ -4,7 +4,8 @@
 import os
 import sqlite3
 import requests
-from github import Github
+
+from github_auth import get_github_client
 
 class CloudDataIngressHub:
     def __init__(self, db_name="kismet_cloud_vault.db"):
@@ -26,21 +27,28 @@ class CloudDataIngressHub:
         ''')
         self.conn.commit()
 
-    def pull_github_repository_data(self, token, repo_name):
+    def pull_github_repository_data(self, repo_name, token: str | None = None):
         # Ingests source code files directly from your active GitHub repository
         print(f"[*] Ingesting codebase files from GitHub repository: {repo_name}...")
-        g = Github(token)
-        repo = g.get_repo(repo_name)
-        contents = repo.get_contents("")
-        while contents:
-            file_content = contents.pop(0)
-            if file_content.type == "dir":
-                contents.extend(repo.get_contents(file_content.path))
-            else:
-                raw_text = file_content.decoded_content.decode("utf-8", errors="ignore")
-                self.cursor.execute("INSERT INTO platform_cache (source_platform, data_payload) VALUES (?, ?)", 
-                                    ("GITHUB", f"File: {file_content.path}\nContent: {raw_text}"))
-        self.conn.commit()
+
+        try:
+            g = get_github_client(token)
+            repo = g.get_repo(repo_name)
+            contents = repo.get_contents("")
+            while contents:
+                file_content = contents.pop(0)
+                if file_content.type == "dir":
+                    contents.extend(repo.get_contents(file_content.path))
+                else:
+                    raw_text = file_content.decoded_content.decode("utf-8", errors="ignore")
+                    self.cursor.execute(
+                        "INSERT INTO platform_cache (source_platform, data_payload) VALUES (?, ?)",
+                        ("GITHUB", f"File: {file_content.path}\nContent: {raw_text}")
+                    )
+            self.conn.commit()
+        except Exception as exc:
+            print(f"[-] Failed to load GitHub repository data: {exc}")
+            raise
 
     def fetch_quantum_entropy_stream(self):
         # Cisco Outshift API provides real quantum vacuum noise randomness for system mutations

@@ -1,2 +1,11 @@
-echo 'GITHUB_TOKEN="your_private_github_token_here"' > ~/YOUR_REPOSITORY_NAME/.env
-echo 'GOOGLE_DRIVE_API_KEY="your_google_drive_key_here"' >> ~/YOUR_REPOSITORY_NAME/.env
+cat > ~/YOUR_REPOSITORY_NAME/.env.template <<'EOF'
+# Do not store secrets in source-controlled files.
+# Use environment variables instead and keep this file as a template only.
+# Example values:
+# GITHUB_TOKEN=ghp_xxx
+# GH_TOKEN=ghp_xxx
+# GOOGLE_DRIVE_API_KEY=your_google_drive_key_here
+EOF
+
+echo "[+] Created environment template: ~/YOUR_REPOSITORY_NAME/.env.template"
+echo "[!] Do not commit .env directly. Export GITHUB_TOKEN or GH_TOKEN in your shell or use a secure secret manager."
