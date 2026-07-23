@@ -1,0 +1,14 @@
+# Optional large repos / data bundles
+buzz/
+cloudstack/
+gigatoken/
+grok-build/
+notebook_seed/
+notebook_seed_extracted/
+worldmonitor/
+
+# Local development files
+.env
+*.pyc
+__pycache__/
+.DS_Store
