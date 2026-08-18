@@ -1,0 +1,41 @@
+# Legacy Ambiguous Logic (Failing due to variable misalignment)
+# old_syntax_alert = "buy EURUSD risk=1 sl=30 tp=60"
+
+# Modern Kismet-1 Explicit Orchestration Payload Schema
+kismet_orchestration_parameter_map = {
+    # 1. Volume Specification
+    "vol_lots": "1.0",         # Explicit target trading lot size
+    "vol_pct": "2.5",          # Alternative explicit account risk margin allocation
+    
+    # 2. Risk Management (Stop Loss Boundaries)
+    "sl_pips": "30.0",         # Explicit fixed index points margin drop
+    "sl_price": "1.08500",     # Explicit target asset threshold point limit
+    
+    # 3. Execution Targets (Take Profit Boundaries)
+    "tp_pips": "60.0",         # Explicit fixed profit target index steps
+    "tp_pct": "1.5"            # Percentage-based threshold targets
+}
+
+def compile_alert_instruction_string(action: str, symbol: str, params: dict) -> str:
+    """
+    Assembles parameters into a strict, predictable alert string that eliminates
+    vague system interpretations at runtime.
+    """
+    base_instruction = f"{action.lower()} {symbol.upper()}"
+    
+    # Map out explicit arguments safely
+    syntax_tokens = []
+    for key, value in params.items():
+        if key.startswith(("vol_", "sl_", "tp_")):
+            syntax_tokens.append(f"{key}={value}")
+            
+    final_alert_payload = f"{base_instruction} {','.join(syntax_tokens)}"
+    return final_alert_payload
+
+# Usage Verification Output Example
+alert_payload_example = compile_alert_instruction_string(
+    action="buy", 
+    symbol="EURUSD", 
+    params=kismet_orchestration_parameter_map
+)
+# Output string prints out cleanly: "buy EURUSD vol_lots=1.0,vol_pct=2.5,sl_pips=30.0,sl_price=1.08500,tp_pips=60.0,tp_pct=1.5"
