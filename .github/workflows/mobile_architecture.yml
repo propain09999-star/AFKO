@@ -1,0 +1,43 @@
+name: Mobile Architecture Compilation Engine
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Cross-Compilation Toolchains
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu
+
+      - name: Build and Run Desktop Core
+        run: |
+          g++ -std=c++17 -O3 -Wall -Wextra -pedantic \
+            mobile_fractran_core.cpp -o x86_engine
+          test "$(./x86_engine)" = "state=1 steps=3"
+
+      - name: Cross-Compile ARM64 Core
+        run: |
+          aarch64-linux-gnu-g++ -std=c++17 -O3 -Wall -Wextra \
+            -march=armv8-a+crypto -ffast-math \
+            -fomit-frame-pointer -funroll-loops \
+            mobile_fractran_core.cpp -o mobile_fractran_engine_arm64
+          file mobile_fractran_engine_arm64
+
+      - name: Upload ARM64 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-fractran-core-arm64
+          path: mobile_fractran_engine_arm64

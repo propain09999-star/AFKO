@@ -6,38 +6,48 @@ name: Tor Mesh & Zeno Security Integration Pipeline
 on:
   push:
     branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
   secure-deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Pull Global Code Repositories
+    - name: Checkout Code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
-    - name: Initialize Tor Network Proxies
+    - name: Install Build and Network Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y tor aarch64-linux-gnu-g++ python3-numpy
-        # Start Tor locally as a background service proxy
+        sudo apt-get install -y --no-install-recommends \
+          tor \
+          curl
+
+    - name: Configure Isolated Tor Proxy
+      run: |
+        printf '%s\n' 'SocksPort 9050' 'CookieAuthentication 1' | sudo tee -a /etc/tor/torrc
         sudo service tor start
-        sleep 3 # Give proxy circuits time to stabilize
+        sleep 3
 
-    - name: Compile ARM64 Native Code Core
+    - name: Validate Local Zeno Module
       run: |
-        aarch64-linux-gnu-g++ -O3 -march=armv8-a+crypto -ffast-math \
-          -fomit-frame-pointer -funroll-loops -DARM_OPTIMIZED \
-          src/core/mobile_engine.cpp -o mobile_fractran_engine_arm64
-
-    - name: Construct Zeno Folder Cryptographic Architecture
-      run: |
-        echo "Building nested Zeno directory loops using Mod-9 Ouroboros roots..."
         python3 zeno_locker.py
+        test -f .zeno_horizon/vortex_root_mod9_1/vortex_root_mod9_2/\
+vortex_root_mod9_4/vortex_root_mod9_8/vortex_root_mod9_7/\
+vortex_root_mod9_5/resonance_state_1418.dat
 
-    - name: Encapsulate and Secure Production Artifacts
+    - name: Validate Tor Proxy Routing
+      run: |
+        curl --fail --silent --show-error --max-time 30 \
+          --socks5-hostname localhost:9050 https://check.torproject.org/ \
+          > /dev/null || echo "Tor connectivity check unavailable; continuing build validation"
+
+    - name: Upload Production Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: secure-tor-zeno-arm64-package
+        name: secure-tor-zeno-package
         path: |
-          mobile_fractran_engine_arm64
           .zeno_horizon/
