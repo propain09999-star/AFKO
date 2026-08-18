@@ -16,7 +16,6 @@ class CloudDataIngressHub:
         print("[+] KISMET Ingress Matrix: Cloud API Connections Engaged.")
 
     def initialize_storage_tables(self):
-        # Create a single index to store data uniformly across all platforms
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS platform_cache (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,10 +26,38 @@ class CloudDataIngressHub:
         ''')
         self.conn.commit()
 
-    def pull_github_repository_data(self, repo_name, token: str | None = None):
-        # Ingests source code files directly from your active GitHub repository
-        print(f"[*] Ingesting codebase files from GitHub repository: {repo_name}...")
+    def pull_local_repository_data(self, local_path):
+        print(f"[*] Ingesting local repository data from: {local_path}")
 
+        for root, _, files in os.walk(local_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                if not file_path.lower().endswith((".py", ".md", ".json", ".yaml", ".yml", ".txt")):
+                    continue
+                try:
+                    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                        raw_text = f.read()
+                except Exception:
+                    continue
+
+                self.cursor.execute(
+                    "INSERT INTO platform_cache (source_platform, data_payload) VALUES (?, ?)",
+                    ("LOCAL", f"File: {os.path.relpath(file_path, local_path)}\nContent: {raw_text}")
+                )
+
+        self.conn.commit()
+
+    def pull_repository_data(self, repo_name=None, local_path=None, token: str | None = None):
+        if local_path:
+            return self.pull_local_repository_data(local_path)
+
+        if repo_name and os.path.isdir(repo_name):
+            return self.pull_local_repository_data(repo_name)
+
+        if not repo_name:
+            raise ValueError("Repository name or local path must be provided.")
+
+        print(f"[*] Ingesting codebase files from GitHub repository: {repo_name}...")
         try:
             g = get_github_client(token)
             repo = g.get_repo(repo_name)
@@ -51,7 +78,6 @@ class CloudDataIngressHub:
             raise
 
     def fetch_quantum_entropy_stream(self):
-        # Cisco Outshift API provides real quantum vacuum noise randomness for system mutations
         print("[+] Fetching high-entropy seed from Cisco Outshift Hardware Node...")
         headers = {"Content-Type": "application/json", "x-id-api-key": "DEMO_KEY_OR_MOCK_OVERRIDE"}
         data = {"encoding": "raw", "format": "all", "bits_per_block": 16, "number_of_blocks": 1}
@@ -60,10 +86,9 @@ class CloudDataIngressHub:
             if res.status_code == 200:
                 return res.json().get("data", "0xFA71D23E")
         except Exception:
-            return "0xFA71D23E" # Fallback to core block entropy
+            return "0xFA71D23E"
 
-# Execution block to initialize components live
+
 if __name__ == "__main__":
     hub = CloudDataIngressHub()
-    # Active pipelines run automatically behind the scenes
     print("[*] Cloud pipelines connected. System caching structural data inputs...")
