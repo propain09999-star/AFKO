@@ -1,0 +1,60 @@
+import os
+from web3 import Web3
+
+class CryptographicTransactionSigner:
+    def __init__(self):
+        # Public Sepolia Testnet RPC
+        self.rpc_url = "https://ankr.com"
+        self.w3 = Web3(Web3.HTTPProvider(self.rpc_url))
+        
+        # Hardcoded placeholder private key for secure testing variables
+        # In a secure deployment, load this safely using environment variables
+        self.test_private_key = os.getenv("COSMIC_PRIVATE_KEY", "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+        
+        try:
+            self.my_address = self.w3.eth.account.from_key(self.test_private_key).address
+            print(f"[+] Cryptographic Account Initialized: {self.my_address}")
+        except Exception:
+            self.my_address = "0x0000000000000000000000000000000000000000"
+            print("[-] Warning: Running on localized mock placeholder account keys.")
+
+    def dispatch_mock_funds(self, recipient_address: str, amount_ether: float):
+        """Constructs, cryptographically signs, and broadcasts a live network transaction."""
+        if not self.w3.is_connected():
+            print("[-] Network Dissonance: Cannot reach block distribution node.")
+            return None
+
+        checksum_recipient = self.w3.to_checksum_address(recipient_address)
+        
+        try:
+            # Build the structural transaction payload matrix
+            tx_payload = {
+                'nonce': self.w3.eth.get_transaction_count(self.my_address),
+                'to': checksum_recipient,
+                'value': self.w3.to_wei(amount_ether, 'ether'),
+                'gas': 21000, # Base gas cost for an absolute Ether transfer
+                'maxFeePerGas': self.w3.to_wei(50, 'gwei'),
+                'maxPriorityFeePerGas': self.w3.to_wei(2, 'gwei'),
+                'chainId': 11155111 # Standard Chain ID variable for Sepolia Testnet
+            }
+            
+            print(f"[>] Constructing payload block. Sending {amount_ether} SepoliaETH...")
+            
+            # Sign the raw data locally inside device memory
+            signed_tx = self.w3.eth.account.sign_transaction(tx_payload, self.test_private_key)
+            
+            # Broadcast the signed raw hex array to the global cluster network
+            tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+            
+            print(f"[🏆] Transaction Dispatched into Web3 Mesh! Hash: {tx_hash.hex()}")
+            return tx_hash.hex()
+            
+        except Exception as e:
+            print(f"[-] Broadcast Denied by Network Rules: {str(e)}")
+            print("[~] Tip: Ensure the local private key holds sufficient testnet gas balance.")
+            return None
+
+if __name__ == "__main__":
+    signer = CryptographicTransactionSigner()
+    # Attempting an automated execution loop test transfer to a burn vault address
+    signer.dispatch_mock_funds("0x0000000000000000000000000000000000000000", 0.0001)

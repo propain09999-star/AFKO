@@ -1,0 +1,38 @@
+import os
+import json
+import time
+
+class DiagnosticsDashboard:
+    def __init__(self):
+        self.metrics_dest = "cosmic_dashboard_view.json"
+        self.module_registry = [
+            "sys_monitor.py", "cosmic_engine.py", "cosmic_crypto.py",
+            "cosmic_data.py", "cosmic_swarm.py", "cosmic_wallet.py",
+            "cosmic_quantum.py", "cosmic_web3.py", "cosmic_contracts.py",
+            "cosmic_notifier.py", "cosmic_failover.py", "cosmic_vault.py"
+        ]
+
+    def compile_system_state(self) -> dict:
+        """Scans the local headless architecture and generates health reports."""
+        module_status = {}
+        for module in self.module_registry:
+            exists = os.path.exists(module)
+            module_status[module] = "ARMED / ONLINE" if exists else "MISSING / OFFLINE"
+
+        dashboard_payload = {
+            "system_epoch": time.time(),
+            "architecture_mode": "Headless Static Observer",
+            "total_registered_modules": len(self.module_registry),
+            "module_integrity_matrix": module_status,
+            "local_database_size_bytes": os.path.getsize("local_fractal_db.json") if os.path.exists("local_fractal_db.json") else 0,
+            "vault_locked_state": os.path.exists("secured_vault.enc")
+        }
+        
+        with open(self.metrics_dest, "w") as f:
+            json.dump(dashboard_payload, f, indent=4)
+        return dashboard_payload
+
+if __name__ == "__main__":
+    reporter = DiagnosticsDashboard()
+    report = reporter.compile_system_state()
+    print(f"[+] Diagnostics Dashboard Compiled Successfully.\nIntegrity Matrix: {json.dumps(report['module_integrity_matrix'], indent=2)}")

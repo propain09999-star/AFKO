@@ -1,0 +1,52 @@
+import os, json, time, hmac, hashlib, threading, psutil
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import numpy as np
+
+CRYPTO_KEY = b"NEUROMORPHIC_RELATIVISTIC_SECURE_TOKEN_2026"
+
+class GrandUnifiedChargingKernel:
+    def __init__(self, root_dir="vault_root"):
+        self.root_dir = root_dir
+        self.bin_to_dna = {'00': 'A', '01': 'C', '10': 'G', '11': 'T'}
+        self.lock = threading.Lock()
+        self.paths = {
+            "COMPRESSED": os.path.join(root_dir, "compressed_dna"),
+            "DROPZONE": os.path.join(root_dir, "inbound_dropzone")
+        }
+        self.device_temp, self.is_running = 30.0, True
+        for p in self.paths.values(): os.makedirs(p, exist_ok=True)
+
+    def is_charging(self):
+        """Absolute hardware check via psutil."""
+        batt = psutil.sensors_battery()
+        return batt.power_plugged if batt else True
+
+    def process_dna_and_purge(self, text):
+        """Formula: Quaternary DNA mirror + self-healing parity."""
+        binary = ''.join(f'{b:08b}' for b in text.encode())
+        mirrored = binary + binary
+        return ''.join(self.bin_to_dna[mirrored[i:i+]] for i in range(0, len(mirrored), 2))
+
+    def charging_observer_loop(self):
+        """Background Thread: Gated by charging state."""
+        while self.is_running:
+            if not self.is_charging():
+                time.sleep(5) # Eco-Mode
+                continue
+            
+            files = os.listdir(self.paths["DROPZONE"])
+            for f_name in files:
+                f_path = os.path.join(self.paths["DROPZONE"], f_name)
+                try:
+                    with open(f_path, 'r') as f: data = f.read()
+                    dna = self.process_dna_and_purge(data)
+                    with open(os.path.join(self.paths["COMPRESSED"], f"{f_name}.dna"), 'w') as out:
+                        out.write(dna)
+                    os.remove(f_path) # Post-processing garbage collection
+                    time.sleep(0.015) # 15ms cooling gap
+                except: continue
+            time.sleep(0.5)
+
+# Kernel Initiation
+kernel = GrandUnifiedChargingKernel()
+threading.Thread(target=kernel.charging_observer_loop, daemon=True).start()

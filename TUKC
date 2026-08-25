@@ -1,0 +1,128 @@
+import os
+import json
+import time
+import hmac
+import hashlib
+import threading
+import psutil
+import numpy as np
+
+CRYPTO_KEY = b"NEUROMORPHIC_RELATIVISTIC_SECURE_TOKEN_2026"
+
+class GrandUnifiedChargingKernel:
+    def __init__(self, root_dir="vault_root"):
+        self.root_dir = root_dir
+        # Binary to Quaternary Nucleotide Mapping
+        self.bin_to_dna = {'00': 'A', '01': 'C', '10': 'G', '11': 'T'}
+        self.lock = threading.Lock()
+        self.paths = {
+            "COMPRESSED": os.path.join(root_dir, "compressed_dna"),
+            "DROPZONE": os.path.join(root_dir, "inbound_dropzone")
+        }
+        self.device_temp, self.is_running = 30.0, True
+        for p in self.paths.values(): 
+            os.makedirs(p, exist_ok=True)
+
+    def is_charging(self):
+        """Absolute hardware check via psutil."""
+        batt = psutil.sensors_battery()
+        return batt.power_plugged if batt else True
+
+    def process_dna_and_purge(self, text: str) -> str:
+        """Formula: Quaternary DNA mirror + self-healing parity."""
+        binary = ''.join(f'{ord(b):08b}' for b in text)
+        # Mirroring the binary sequence for structural parity / error correction
+        mirrored = binary + binary
+        
+        # FIXED: Added the 2-step slice to process pairs of bits into nucleotides
+        return ''.join(self.bin_to_dna[mirrored[i:i+2]] for i in range(0, len(mirrored), 2))
+
+    def collect_agi_telemetry(self) -> dict:
+        """Gathers unified system metrics and mocked business metrics."""
+        # System Metrics via psutil
+        cpu_usage = psutil.cpu_percent()
+        mem_usage = psutil.virtual_memory().percent
+        disk_io = psutil.disk_io_counters()
+        
+        # Mocked Business Performance Data (Simulated live ingestion)
+        simulated_revenue_velocity = np.random.uniform(100.0, 500.0) 
+        simulated_user_signups = int(np.random.poisson(lam=5))
+        
+        metrics = {
+            "timestamp": time.time(),
+            "system_cpu": cpu_usage,
+            "system_mem": mem_usage,
+            "business_rev_velocity": simulated_revenue_velocity,
+            "business_signups": simulated_user_signups,
+            "hardware_charging": self.is_charging()
+        }
+        
+        # Sign the payload with the cryptographic key for secure verification
+        payload_bytes = json.dumps(metrics, sort_keys=True).encode()
+        signature = hmac.new(CRYPTO_KEY, payload_bytes, hashlib.sha256).hexdigest()
+        metrics["signature"] = signature
+        
+        return metrics
+
+    def metric_streaming_generator_loop(self):
+        """Generates real-time telemetry files inside the Dropzone."""
+        counter = 0
+        while self.is_running:
+            if self.is_charging():
+                metrics = self.collect_agi_telemetry()
+                file_path = os.path.join(self.paths["DROPZONE"], f"metric_pulse_{counter}.json")
+                with open(file_path, 'w') as f:
+                    json.dump(metrics, f)
+                counter += 1
+            # Adjust rate based on power state
+            time.sleep(1.0 if self.is_charging() else 10.0)
+
+    def charging_observer_loop(self):
+        """Background Thread: Gated by charging state."""
+        print("🧬 Grand Unified Charging Kernel Active. Awaiting Genomic Input Sequence...")
+        while self.is_running:
+            if not self.is_charging():
+                time.sleep(5)  # Eco-Mode active
+                continue
+            
+            try:
+                files = os.listdir(self.paths["DROPZONE"])
+            except FileNotFoundError:
+                continue
+                
+            for f_name in files:
+                f_path = os.path.join(self.paths["DROPZONE"], f_name)
+                try:
+                    with open(f_path, 'r') as f: 
+                        data = f.read()
+                        
+                    # Process the metric string directly into the quaternary DNA strand
+                    dna = self.process_dna_and_purge(data)
+                    
+                    output_path = os.path.join(self.paths["COMPRESSED"], f"{f_name}.dna")
+                    with open(output_path, 'w') as out:
+                        out.write(dna)
+                        
+                    os.remove(f_path)  # Post-processing garbage collection
+                    time.sleep(0.015)  # 15ms cooling gap
+                except Exception as e: 
+                    continue
+            time.sleep(0.5)
+
+# Kernel Initiation
+kernel = GrandUnifiedChargingKernel()
+
+# Thread 1: Ingesting active system and business data points
+threading.Thread(target=kernel.metric_streaming_generator_loop, daemon=True).start()
+
+# Thread 2: Compressing data to DNA sequences when plugged into power
+observer_thread = threading.Thread(target=kernel.charging_observer_loop, daemon=True)
+observer_thread.start()
+
+# Keep main thread alive for demonstration purposes
+try:
+    while True:
+        time.sleep(1)
+except KeyboardInterrupt:
+    kernel.is_running = False
+    print("\nShutting down Unified Kernel safely.")

@@ -1,0 +1,2 @@
+chmod +x cosmic_complexity.py
+./system_control.sh

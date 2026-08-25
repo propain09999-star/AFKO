@@ -1,0 +1,61 @@
+import polars as pl
+import duckdb
+import os
+
+class LocalDataPipeline:
+    def __init__(self):
+        # Configure internal Polars memory bounds explicitly for 12GB device footprint
+        os.environ["POLARS_MAX_THREADS"] = "4" # Prevent CPU thread starvation on smartphones
+        
+        # Establish localized transient DuckDB connection in-memory
+        self.db_conn = duckdb.connect(database=':memory:')
+        self._initialize_honeypot_structures()
+        
+    def _initialize_honeypot_structures(self):
+        """Creates separate secure production channels and decoy honey-tables."""
+        self.db_conn.execute("""
+            CREATE TABLE prod_ledger (
+                tx_id VARCHAR, amount DOUBLE, compliance_flag INTEGER
+            );
+            CREATE TABLE honey_decoy_ledger (
+                tx_id VARCHAR, amount DOUBLE, rogue_signature VARCHAR, capture_time TIMESTAMP
+            );
+        """)
+
+    def process_incoming_stream(self, csv_payload_string, system_state_bit):
+        """Processes and segments incoming data based on the single-bit metadata state."""
+        
+        # Step 1: Use Polars streaming logic to process incoming lines with minimal memory
+        df = pl.read_csv(csv_payload_string.encode('utf-8'))
+        
+        # Step 2: MQB Network/Zone Mitigation routing checks
+        if system_state_bit == 1:
+            # SYSTEM IS IN FOLDED SHEAR: Route all stream metrics into the honey-decoy table
+            print("--> [MQB WARNING] System State 1 Active. Redirecting traffic to Honeypot...")
+            
+            # Convert filtered dataframe directly to pandas format for seamless DuckDB ingestion
+            decoy_data = df.to_pandas()
+            self.db_conn.execute("INSERT INTO honey_decoy_ledger SELECT *, NOW() FROM decoy_data;")
+            
+            # Return isolated diagnostic view
+            return self.db_conn.execute("SELECT * FROM honey_decoy_ledger;").pl()
+        else:
+            # SYSTEM IS IN BASELINE CORE: Safely process standard financial metrics
+            print("--> [MQB NORMAL] System State 0 Active. Processing data into production...")
+            prod_data = df.to_pandas()
+            self.db_conn.execute("INSERT INTO prod_ledger SELECT * FROM prod_data;")
+            return self.db_conn.execute("SELECT * FROM prod_ledger;").pl()
+
+# Sample execution demonstrating isolated pipeline processing
+if __name__ == "__main__":
+    pipeline = LocalDataPipeline()
+    
+    sample_data = "tx_id,amount,compliance_flag\nTX_A01,4500.25,0\nTX_B02,125000.00,1"
+    
+    # Run 1: Execution under normal operations (State 0)
+    res_normal = pipeline.process_incoming_stream(sample_data, system_state_bit=0)
+    print(res_normal)
+    
+    # Run 2: Execution under containment breach actions (State 1)
+    res_breach = pipeline.process_incoming_stream(sample_data, system_state_bit=1)
+    print(res_breach)

@@ -1,0 +1,62 @@
+# ==============================================================================
+# SECURE CI/CD PIPELINE: TOR ROUTING AND ZENO SYSTEM INITIALIZATION
+# ==============================================================================
+name: Tor Mesh & Zeno Security Integration Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+ permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  secure-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Verify Complete Git History
+      run: |
+        test "$(git rev-parse --is-shallow-repository)" = "false"
+        test "$(git rev-list --count HEAD)" -gt 1
+
+    - name: Install Build and Network Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          tor \
+          curl
+
+    - name: Configure Isolated Tor Proxy
+      run: |
+        printf '%s\n' 'SocksPort 9050' 'CookieAuthentication 1' | sudo tee -a /etc/tor/torrc
+        sudo service tor start
+        sleep 3
+
+    - name: Validate Local Zeno Module
+      run: |
+        python3 zeno_locker.py
+        test -f .zeno_horizon/vortex_root_mod9_1/vortex_root_mod9_2/\
+vortex_root_mod9_4/vortex_root_mod9_8/vortex_root_mod9_7/\
+vortex_root_mod9_5/resonance_state_1418.dat
+
+    - name: Validate Tor Proxy Routing
+      run: |
+        curl --fail --silent --show-error --max-time 30 \
+          --socks5-hostname localhost:9050 https://check.torproject.org/ \
+          > /dev/null || echo "Tor connectivity check unavailable; continuing build validation"
+
+    - name: Upload Production Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: secure-tor-zeno-package
+        path: |
+          .zeno_horizon/

@@ -1,0 +1,64 @@
+import subprocess
+import json
+
+def run_local_semgrep_scan(target_repo_dir):
+    """
+    Runs Semgrep programmatically using our custom yaml rule profiles.
+    """
+    print("[*] Launching Semgrep engine scan pipeline...")
+    
+    cmd = [
+        "semgrep", "scan",
+        "--config", "security_rules.yaml",
+        "--json",
+        target_repo_dir
+    ]
+    
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        # Parse the JSON results produced by Semgrep's execution
+        scan_data = json.loads(result.stdout)
+        return scan_data.get("results", [])
+    except Exception as e:
+        print(f"[-] Semgrep execution engine error: {e}")
+        return []
+
+def full_coordinated_pipeline(repo_url, repo_language):
+    # 1. (From previous step) Clone the raw repository locally
+    local_path = "./tmp/target_repo"
+    
+    # 2. Spin up the isolated Docker workspace container environment
+    sandbox = create_isolated_sandbox(local_path, language=repo_language)
+    if not sandbox: return
+    
+    try:
+        # 3. Compile or check packages safely inside the container sandbox
+        is_valid_build = execute_safe_compile(sandbox, language=repo_language)
+        if not is_valid_build:
+            print("[-] Build or compilation errors found in target repository. Aborting scan.")
+            return
+
+        # 4. Execute custom structural Semgrep scans locally
+        vulnerabilities = run_local_semgrep_scan(local_path)
+        
+        for vuln in vulnerabilities:
+            file_implicated = vuln['path']
+            print(f"[!] Structural flaw flagged by Semgrep rule match in: {file_implicated}")
+            
+            # Read the code context
+            with open(file_implicated, 'r') as f:
+                raw_code = f.read()
+                
+            # 5. Route the finding details to the AI verification logic
+            # (Passing 'raw_code' to your engine_ai_zero_day function here)
+            print("[*] Forwarding structural file context to AI for deep verification analysis...")
+            
+    finally:
+        # ALWAYS destroy and clean up the container sandbox space when finished
+        print("[*] Dismantling and cleaning sandbox containers safely...")
+        sandbox.stop()
+        sandbox.remove()
+
+if __name__ == "__main__":
+    # Example execution flow setup logic
+    print("[+] Core engine automation architecture initializations complete.")

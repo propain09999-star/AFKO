@@ -1,0 +1,2 @@
+# Target only specific GPUs inside dense server systems
+docker run --gpus '"device=0"' -v $(pwd):/workspace plct_system

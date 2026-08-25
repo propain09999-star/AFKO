@@ -1,0 +1,63 @@
+import os
+import docker
+
+def create_isolated_sandbox(repo_local_path, language="python"):
+    """
+    Creates an ephemeral, network-isolated container to safely build,
+    compile, and handle third-party modules.
+    """
+    client = docker.from_env()
+    print(f"[*] Provisioning isolated sandbox container for {language}...")
+
+    # Define base images optimized for building target language environments
+    image_map = {
+        "python": "python:3.11-slim",
+        "go": "golang:1.22-alpine",
+        "javascript": "node:20-slim"
+    }
+    
+    target_image = image_map.get(language, "ubuntu:latest")
+
+    # Map the local cloned repository directory inside the isolated folder
+    container_mount_path = "/usr/src/app"
+    
+    try:
+        # Spin up the container with strict execution controls
+        container = client.containers.run(
+            image=target_image,
+            command="tail -f /dev/null", # Keep container alive for execution instructions
+            volumes={
+                os.path.abspath(repo_local_path): {
+                    'bind': container_mount_path,
+                    'mode': 'rw'
+                }
+            },
+            detach=True,
+            network_disabled=True,      # Crucial: Disables outbound network access to prevent data leaks
+            mem_limit="512m",           # Prevent Denial of Service (DoS) memory consumption attacks
+            nano_cpus=1000000000        # Caps CPU execution to 1 Core max
+        )
+        return container
+    except Exception as e:
+        print(f"[-] Sandbox creation failed: {e}")
+        return None
+
+def execute_safe_compile(container, language="python"):
+    """
+    Compiles/verifies files from within the safe boundaries of the container.
+    """
+    print("[*] Executing sandbox-isolated build checks...")
+    
+    commands = {
+        "python": "python3 -m py_compile /usr/src/app/*.py",
+        "go": "cd /usr/src/app && go build -v ./...",
+        "javascript": "cd /usr/src/app && npm install --dry-run"
+    }
+    
+    run_command = commands.get(language, "echo 'No compilation step mapped'")
+    
+    # Run execution steps securely inside the container
+    exec_result = container.exec_run(cmd=f"sh -c '{run_command}'")
+    
+    print(f"[#] Build Output Log:\n{exec_result.output.decode('utf-8', errors='ignore')}")
+    return exec_result.exit_code == 0

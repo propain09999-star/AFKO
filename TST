@@ -1,0 +1,156 @@
+import asyncio
+import json
+import time
+import hashlib
+import hmac
+
+# --- CRYPTOGRAPHIC INTELLIGENCE VALIDATION ---
+def verify_incoming_packet(packet_json, secret_key=b"SOVEREIGN_ARCHITECT_SECRET"):
+    """
+    Validates payload integrity using HMAC-SHA256 signatures.
+    Ensures remote cloud boxes have not been intercepted or altered.
+    """
+    try:
+        data = json.loads(packet_json)
+        received_signature = data.get("signature")
+        if not received_signature:
+            return False, "Missing cryptographic signature."
+        
+        # Recompute hash based on core telemetry payload
+        payload_bytes = json.dumps(data["payload"], sort_keys=True).encode()
+        expected_signature = hmac.new(secret_key, payload_bytes, hashlib.sha256).hexdigest()
+        
+        if hmac.compare_digest(received_signature, expected_signature):
+            return True, data
+        return False, "Signature mismatch. Data untrusted."
+    except Exception as e:
+        return False, f"Validation failure: {str(e)}"
+
+def generate_signed_packet(source_layer, vector, target, payload, secret_key=b"SOVEREIGN_ARCHITECT_SECRET"):
+    """Utility to sign payloads at the remote collection node before transport."""
+    payload_bytes = json.dumps(payload, sort_keys=True).encode()
+    signature = hmac.new(secret_key, payload_bytes, hashlib.sha256).hexdigest()
+    return json.dumps({
+        "timestamp_epoch": int(time.time() * 1000),
+        "source_layer": source_layer.upper(),
+        "vector": vector.upper(),
+        "target": target.upper(),
+        "payload": payload,
+        "signature": signature
+    })
+
+
+# --- TEMPORAL CHRONO-HEDGE ENGINE (Unlimited Prep Time Planning) ---
+class TemporalChronoEngine:
+    """
+    Calculates cyclical macro threat windows and seasonal computing expansion runs.
+    Acts as a predictive planning framework for long-swing asset allocations.
+    """
+    def __init__(self):
+        # Master timeline containing cyclic vulnerability expansion indices
+        self.cyclical_risk_windows = [
+            {"name": "FISCAL_QUARTER_END_LIQUIDITY_DRAIN", "recurrence_days": 90, "historical_variance": 0.04},
+            {"name": "DEFCON_BLACK_HAT_EXPLOIT_RELEASE_SURGE", "recurrence_days": 365, "historical_variance": 0.12},
+            {"name": "SUMMER_GRID_THERMAL_THROTTLING_WINDOW", "recurrence_days": 365, "historical_variance": 0.08}
+        ]
+
+    def calculate_time_to_disruption(self):
+        """Computes proximity markers to predictable systemic stress cycles."""
+        current_epoch = time.time()
+        days_since_baseline = (current_epoch / 86400) % 365
+        
+        # Analyze current proximity to the Summer Grid Thermal Throttling Window (Roughly Days 170-220 of the year)
+        # Highly relevant for monitoring PJM/ERCOT cluster limits during summer heat waves
+        if 170 <= days_since_baseline <= 220:
+            return {"active_threat_window": "SUMMER_THERMAL_STRAIN", "vulnerability_multiplier": 1.45}
+        return {"active_threat_window": "NONE_BASELINE_CONDITIONS", "vulnerability_multiplier": 1.0}
+
+
+# --- LOCAL REPORTING & DATABASE LEDGER ---
+class LocalReportingLedger:
+    def __init__(self):
+        self.portfolio_file = "sovereign_portfolio.jsonl"
+        self.allocations = {
+            "SHORT_TERM": {"USD_VALUE": 0.0, "ASSETS": {}},
+            "MEDIUM_TERM": {"USD_VALUE": 0.0, "ASSETS": {}},
+            "LONG_TERM": {"USD_VALUE": 0.0, "ASSETS": {}}
+        }
+
+    def log_and_render_ui(self, horizon, asset, execution_type, target_size_usd, risk_multiplier):
+        """Updates internal memory metrics and prints a clean, scannable terminal dashboard."""
+        adjusted_size = target_size_usd * risk_multiplier
+        self.allocations[horizon]["ASSETS"][asset] = {
+            "type": execution_type,
+            "allocated": adjusted_size,
+            "last_updated": int(time.time())
+        }
+        
+        # Recalculate portfolio category totals
+        self.allocations[horizon]["USD_VALUE"] = sum(
+            item["allocated"] for item in self.allocations[horizon]["ASSETS"].values()
+        )
+        
+        # High-utility visual anchor output terminal representation
+        print("\n" + "="*60)
+        print(f"👁️ 📊 SOVEREIGN PORTFOLIO OVERVIEW | RADAR ACTIVE")
+        print("="*60)
+        for h_zone in ["SHORT_TERM", "MEDIUM_TERM", "LONG_TERM"]:
+            total_val = self.allocations[h_zone]["USD_VALUE"]
+            print(f" 🟩 {h_zone:<12} Total Exposure: ${total_val:,.2f}")
+            for ast, details in self.allocations[h_zone]["ASSETS"].items():
+                print(f"   ├─> {ast:<25} Status: {details['type']:<15} Size: ${details['allocated']:,.2f}")
+        print("="*60 + "\n")
+
+
+# --- CENTRAL PURPLE MANAGEMENT CORE ---
+class PurpleMatrixOrchestrator:
+    def __init__(self):
+        self.ledger = LocalReportingLedger()
+        self.chrono = TemporalChronoEngine()
+
+    async def ingest_and_process(self, signed_packet_json):
+        # 1. Cryptographic Authentication Layer
+        success, verified_data = verify_incoming_packet(signed_packet_json)
+        if not success:
+            print(f"🚨 [SECURITY DROPPED] Raw string verification failure: {verified_data}")
+            return
+        
+        vector = verified_data["vector"]
+        target = verified_data["target"]
+        payload = verified_data["payload"]
+        
+        # 2. Temporal Risk Evaluation Layer
+        temporal_context = self.chrono.calculate_time_to_disruption()
+        risk_mod = temporal_context["vulnerability_multiplier"]
+        
+        # 3. Direct Strategy Allocation Matrix
+        if vector == "POWER_TELEMETRY" and payload["dev"] > 0.15:
+            # Power anomalies map directly to unannounced long-swing data center expansions
+            self.ledger.log_and_render_ui("LONG_TERM", "REGIONAL_UTILITIES_ETF", "LONG_ACCUMULATE", 400000, risk_mod)
+            self.ledger.log_and_render_ui("MEDIUM_TERM", "DATA_CENTER_REITS", "LONG_ACCUMULATE", 200000, risk_mod)
+            
+        elif vector == "MIASMA_VULN" and payload["infected"] > 1000:
+            # Active software supply chain exploits trigger immediate short positions to hedge downside risk
+            self.ledger.log_and_render_ui("SHORT_TERM", "TECH_INDEX_SHORT_SWING", "EXECUTE_SHORT", 800000, risk_mod)
+
+
+# --- ENGINE ENTRY RUNNER ---
+async def execution_sandbox():
+    orchestrator = PurpleMatrixOrchestrator()
+    
+    print("   Starting Sovereign System Core Ingestion Engines...")
+    
+    # Simulating secure inbound encrypted data streams generated by remote cloud miners
+    mock_payload_1 = {"mw_draw": 15900, "dev": 0.22}
+    signed_grid_packet = generate_signed_packet("QUARK", "POWER_TELEMETRY", "PJM_VA", mock_payload_1)
+    
+    mock_payload_2 = {"sig": "ebpf_root_v2", "infected": 2450}
+    signed_security_packet = generate_signed_packet("SUB_QUARK", "MIASMA_VULN", "ARCH_LINUX", mock_payload_2)
+    
+    # Feed secure streams directly through the analysis pipeline
+    await orchestrator.inject_and_process(signed_grid_packet)
+    await asyncio.sleep(2)
+    await orchestrator.inject_and_process(signed_security_packet)
+
+if __name__ == "__main__":
+    asyncio.run(execution_sandbox())

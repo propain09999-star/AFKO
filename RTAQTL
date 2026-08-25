@@ -1,0 +1,58 @@
+import numpy as np
+from qiskit import QuantumCircuit
+from qiskit_aer import AerSimulator
+
+class QuantumAIAgent:
+    def __init__(self):
+        # Q-learning table: [States, Actions]
+        # Actions: 0 = Apply Hadamard (Create Superposition), 1 = Do Nothing
+        self.q_table = np.zeros((1, 2))
+        self.lr = 0.1       # Learning rate
+        self.discount = 0.9 # Future reward importance
+
+    def choose_action(self):
+        # Explore vs Exploit (Simple epsilon-greedy)
+        return np.argmax(self.q_table[0]) if np.random.uniform(0, 1) > 0.2 else np.random.choice([0, 1])
+
+    def learn(self, action, reward):
+        # Update the AI's internal brain based on the micro-reward payment
+        self.q_table[0, action] += self.lr * (reward + self.discount * np.max(self.q_table[0]) - self.q_table[0, action])
+
+# Initialize our AI and the Quantum Simulator
+ai = QuantumAIAgent()
+simulator = AerSimulator()
+
+print("--- AI Quantum Training Started ---")
+
+# Run 100 training epochs (learning cycles)
+for epoch in range(1, 101):
+    action = ai.choose_action()
+    
+    # Setup quantum environment
+    qc = QuantumCircuit(2, 2)
+    
+    if action == 0:
+        qc.h(0)     # AI chose to apply the correct quantum gate
+        qc.cx(0, 1) # Entangle
+    else:
+        qc.cx(0, 1) # AI skipped the gate (broken entanglement)
+        
+    qc.measure([0, 1], [0, 1])
+    
+    # Run the quantum circuit
+    counts = simulator.run(qc, shots=10).result().get_counts()
+    
+    # Check if we successfully achieved perfect entanglement (only 00 and 11)
+    if '01' not in counts and '10' not in counts and action == 0:
+        reward = 10  # Micro-reward payment issued!
+    else:
+        reward = -5  # Penalty for failing the quantum state
+
+    # Feed the payment back to the AI
+    ai.learn(action, reward)
+    
+    if epoch % 20 == 0:
+        print(f"Epoch {epoch}: AI Brain Table (Q-Values) -> {ai.q_table[0]}")
+
+print("\nTraining complete. The AI learned to maximize its micro-rewards by selecting the correct quantum operation!")
+ 

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Create a secure template for environment variables.
+
+TARGET_DIR="${REPO_ROOT:-$(pwd)}"
+cat > "$TARGET_DIR/.env.template" <<'EOF'
+# Do not store secrets in source-controlled files.
+# Copy this file to .env and keep the actual secret values private.
+# Example values:
+# GITHUB_TOKEN=ghp_xxx
+# GH_TOKEN=ghp_xxx
+# GITHUB_PAT=ghp_xxx
+# AFKO_BOOT_MODE=local
+# AFKO_LOCAL_REPO_DIR=/path/to/local/repo
+EOF
+
+echo "[+] Created environment template: $TARGET_DIR/.env.template"
+echo "[!] Do not commit .env. Export values in your shell or use a secure secret manager."

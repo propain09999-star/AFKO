@@ -1,0 +1,44 @@
+import asyncio
+import json
+import websockets
+
+class LocalIngestionLedger:
+    def __init__(self, cloud_ip="127.0.0.1", port=8765):
+        self.uri = f"ws://{cloud_ip}:{port}"
+        self.ledger_file = "absolute_siege_ledger.jsonl"
+
+    async def connect_and_consume(self):
+        print(f"🛰️ [Local Node] Attempting data bridge to Cloud Box: {self.uri}")
+        while True:
+            try:
+                async with websockets.connect(self.uri) as websocket:
+                    print("⚡ [Local Node] Bridge secured. Stream ingestion active.")
+                    async for message in websocket:
+                        payload = json.loads(message)
+                        await self.process_and_log(payload)
+            except (websockets.ConnectionClosed, ConnectionRefusedError):
+                print("🔄 [Local Node] Cloud connection severed. Retrying handshake in 3 seconds...")
+                await asyncio.sleep(3)
+
+    async def process_and_log(self, payload):
+        """Processes and stores the data locally without any browser overhead"""
+        # Save straight to a localized high-performance flat-file JSON lines format
+        with open(self.ledger_file, "a") as f:
+            f.write(json.dumps(payload) + "\n")
+            
+        # Target specific security and system conditions
+        if payload["event_type"] == "ROOTKIT_DEPLOYED":
+            print(f"🚨 [SIEGE ALERT] Supply chain hit on {payload['target']}! Campaign: {payload['details']['campaign']}")
+        elif payload["event_type"] == "PAGE_CACHE_CORRUPTION":
+            print(f"💥 [ZERO-DAY EXPLODED] {payload['target']} compromised via {payload['details']['cve']}!")
+        else:
+            print(f"📡 [Mined] Vector: {payload['vector']} | Target: {payload['target']} | Logged.")
+
+if __name__ == "__main__":
+    # If running both scripts on the same machine for testing, leave IP as 127.0.0.1
+    # For remote deployment, substitute with your free cloud instance's public IP address
+    ledger = LocalIngestionLedger(cloud_ip="127.0.0.1")
+    try:
+        asyncio.run(ledger.connect_and_consume())
+    except KeyboardInterrupt:
+        print("🛑 [Local Node] Ingestion gracefully unmounted.")

@@ -1,0 +1,79 @@
+import os
+import sys
+import json
+import time
+import subprocess
+import threading
+import psutil
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+class FreeJarvisKernelHandler(BaseHTTPRequestHandler):
+    """Zero-cost local automation gateway for custom browser integration."""
+    
+    def log_message(self, format, *args):
+        pass # Absolute silence in logs
+
+    def do_GET(self):
+        """Serves the status of the local autonomous system layer."""
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        
+        system_status = {
+            "Gideon_Core": "Fully Autonomous",
+            "Hardware_Power": "Charging Network Integrated" if psutil.sensors_battery().power_plugged else "Battery Reserve Matrix",
+            "Active_Processes": len(psutil.pids())
+        }
+        self.wfile.write(json.dumps(system_status).encode())
+
+    def do_POST(self):
+        """Translates plain conversational language directly into shell execution operations."""
+        content_length = int(self.headers.get('Content-Length', 0))
+        post_data = self.rfile.read(content_length).decode('utf-8')
+        
+        try:
+            req = json.loads(post_data)
+            voice_command = req.get("text", "").lower().strip()
+        except Exception:
+            self.send_response(400)
+            self.end_headers()
+            return
+
+        print(f"🎙️ [JARVIS INTENT PARSER] Processing input: '{voice_command}'")
+        execution_msg = "Command received. Processing structural state change..."
+
+        # Native Voice-to-Action Interpreter Loop
+        if "gideon open terminal" in voice_command or "launch terminal" in voice_command:
+            if sys.platform == "win32":
+                subprocess.Popen(["start", "cmd"], shell=True)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", "-a", "Terminal"])
+            else:
+                subprocess.Popen(["x-terminal-emulator"])
+            execution_msg = "🔮 GIDEON: Local terminal instance initialized safely."
+            
+        elif "gideon purge memory" in voice_command or "clean system" in voice_command:
+            # Performs a harmless mock system flush to demonstrate system control hooks
+            execution_msg = "🔮 GIDEON: Active system caches flushed. Memory pools packed down."
+            
+        elif "gideon override matrix" in voice_command:
+            execution_msg = "🔮 GIDEON: Timeline constraints neutralized. Running at max structural performance."
+
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(json.dumps({"status": "Success", "feedback": execution_msg}).encode())
+
+def initialize_jarvis_host():
+    server = HTTPServer(("127.0.0.1", 8888), FreeJarvisKernelHandler)
+    server.serve_forever()
+
+if __name__ == "__main__":
+    print("🛸 Jarvis/Gideon Zero-Cost API Host deployed at http://127.0.0.1:8888")
+    threading.Thread(target=initialize_jarvis_host, daemon=True).start()
+    try:
+        while True: time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n[✔] System synced safely.")

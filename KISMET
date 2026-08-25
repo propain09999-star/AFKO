@@ -1,0 +1,80 @@
+# File Matrix: kismet_engine_daemon.py
+# Execution: python kismet_engine_daemon.py
+
+import os
+import sys
+import json
+import subprocess
+import psutil
+import requests
+
+class KismetEngine:
+    def __init__(self, database_path="kismet_vault.db"):
+        self.db_path = database_path
+        self.ram_threshold_gb = 12.0
+        print("[+] KISMET-ASI Engine Initializing Autonomous Digital Control...")
+
+    def get_hardware_telemetry(self):
+        # Natively loop hardware stats without manual text instruction
+        ram_metrics = psutil.virtual_memory()
+        cpu_usage = psutil.cpu_percent(interval=0.5)
+        available_ram_gb = ram_metrics.available / (1024**3)
+        
+        return {
+            "cpu_utilization_percent": cpu_usage,
+            "allocated_ram_gb": (ram_metrics.total / (1024**3)),
+            "available_workspace_ram_gb": available_ram_gb
+        }
+
+    def fetch_quantum_entropy(self):
+        # Fetch high-entropy parameters to feed our mutation sandboxes
+        url = "https://anu.edu.au"
+        try:
+            res = requests.get(url, timeout=3)
+            if res.status_code == 200:
+                return res.json()["data"][0]
+        except Exception:
+            return "fallback_entropy_0xABC123"
+
+    def execute_terminal_command(self, bash_command):
+        # This API gives the AI the power to use your phone's terminal like a developer
+        print(f"[*] AI Agent Executing Terminal Vector: {bash_command}")
+        try:
+            execution_result = subprocess.run(
+                bash_command, shell=True, capture_output=True, text=True, timeout=10
+            )
+            return {
+                "stdout": execution_result.stdout,
+                "stderr": execution_result.stderr,
+                "exit_code": execution_result.returncode
+            }
+        except subprocess.TimeoutExpired:
+            return {"error": "Execution timed out. Process vector terminated."}
+
+    def run_ollama_inference(self, prompt_instruction):
+        # Local Ollama endpoint API loop running on port 11434 inside Termux
+        ollama_url = "http://localhost:11434/api/generate"
+        payload = {
+            "model": "orca-mini:3b",  # Optimized lightweight model footprint for 12GB RAM
+            "prompt": prompt_instruction,
+            "stream": False
+        }
+        try:
+            response = requests.post(ollama_url, json=payload, timeout=30)
+            return response.json().get("response", "")
+        except Exception:
+            return "[-] Error: Local Ollama backend inactive. Run 'ollama serve' in an alternate window."
+
+# Execution block to initialize components live
+if __name__ == "__main__":
+    engine = KismetEngine()
+    
+    # 1. Pull system telemetry variables natively
+    stats = engine.get_hardware_telemetry()
+    print(f"[+] Local System Telemetry Captured: {json.dumps(stats)}")
+    
+    # 2. Check for sandbox updates
+    entropy_seed = engine.fetch_quantum_entropy()
+    print(f"[+] Injected Sub-Quantum Entropy Key: {entropy_seed}")
+    
+    print("[*] Engine initialized on terminal workspace. Awaiting pipeline synchronization...")

@@ -1,0 +1,56 @@
+class LimbicBrainParser
+  attr_reader :routing_instructions
+
+  def initialize
+    @routing_instructions = {
+      dominant_intent: "UNKNOWN",
+      target_api_nodes: [],
+      execution_priority: 1
+    }
+  end
+
+  # Domain Specific Language declarative rules engine
+  def analyze_intent(query_string)
+    normalized = query_string.downcase.strip
+
+    case normalized
+    when /weather/, /temperature/, /rain/, /forecast/
+      map_intent(intent: "ENVIRONMENTAL_RETRIEVAL", priority: 5) do
+        add_synapse "OpenWeatherAPI"
+        add_synapse "GeocodingServiceNode"
+      end
+
+    when /crypto/, /stock/, /price/, /market/
+      map_intent(intent: "FINANCIAL_SYNTHESIS", priority: 9) do # High priority
+        add_synapse "BinancePublicTickerAPI"
+        add_synapse "CoinGeckoFreeTier"
+        add_synapse "AlphaVantageNode"
+      end
+
+    else
+      map_intent(intent: "GENERAL_KNOWLEDGE_SEARCH", priority: 2) do
+        add_synapse "WikipediaTextExtractor"
+      end
+    end
+
+    @routing_instructions
+  end
+
+  private
+
+  def map_intent(intent:, priority:)
+    @routing_instructions[:dominant_intent] = intent
+    @routing_instructions[:execution_priority] = priority
+    yield if block_given?
+  end
+
+  def add_synapse(api_name)
+    @routing_instructions[:target_api_nodes] << api_name
+  end
+end
+
+# Verification check simulating runtime execution
+# parser = LimbicBrainParser.new
+# instructions = parser.analyze_intent("Can you check the current Bitcoin price and market trend?")
+# puts instructions 
+# Output: {:dominant_intent=>"FINANCIAL_SYNTHESIS", :target_api_nodes=>["BinancePublicTickerAPI", "CoinGeckoFreeTier", "AlphaVantageNode"], :execution_priority=>9}

@@ -1,0 +1,209 @@
+import argparse
+import os
+import shlex
+import git
+
+from github_auth import get_github_client
+
+
+def discover_local_repositories(root_dir, query_limit=5):
+    print(f"[*] Discovering local Git repositories under {root_dir}...")
+    local_repos = []
+
+    for root, dirs, files in os.walk(root_dir):
+        if ".git" in dirs:
+            local_repos.append(root)
+            dirs[:] = []
+        if len(local_repos) >= query_limit:
+            break
+
+    targets = []
+    for repo_path in local_repos:
+        try:
+            repo = git.Repo(repo_path)
+            branch_name = repo.active_branch.name if not repo.head.is_detached else "HEAD"
+        except Exception:
+            branch_name = "HEAD"
+
+        targets.append({
+            "name": os.path.basename(repo_path),
+            "local_path": repo_path,
+            "default_branch": branch_name,
+        })
+
+    return targets
+
+
+def crawl_target_repositories(language="python", query_limit=5):
+    print(f"[*] Starting crawler for {language} repositories...")
+    g = get_github_client()
+    query = f"language:{language} stars:>10 pushed:>2026-01-01"
+    repositories = g.search_repositories(query=query, sort="updated", order="desc")
+
+    targets = []
+    for repo in repositories[:query_limit]:
+        targets.append({
+            "name": repo.full_name,
+            "clone_url": repo.clone_url,
+            "default_branch": repo.default_branch,
+        })
+    return targets
+
+
+def get_targets(mode="mixed", local_root=".", language="python", query_limit=5):
+    mode = mode.lower()
+    targets = []
+
+    if mode in ("local", "mixed"):
+        targets.extend(discover_local_repositories(local_root, query_limit))
+
+    if mode in ("github", "mixed"):
+        try:
+            targets.extend(crawl_target_repositories(language=language, query_limit=query_limit))
+        except Exception as exc:
+            print(f"[-] GitHub discovery failed: {exc}")
+
+    if not targets:
+        print("[!] No targets were discovered for the selected mode.")
+
+    return targets
+
+
+def compile_and_extract_ast(local_path):
+    print(f"[*] Parsing module structure inside {local_path}...")
+    valid_files = []
+    for root, _, files in os.walk(local_path):
+        for file in files:
+            if file.endswith(".py") and not file.startswith("."):
+                valid_files.append(os.path.join(root, file))
+    return valid_files
+
+
+def zero_day_scanner(file_path):
+    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+        content = f.read()
+
+    if "os.system(" in content or "subprocess.Popen(shell=True" in content:
+        print(f"[!] ZERO-DAY CRITICAL: Command Injection vector found in {file_path}")
+        return True, content
+    return False, None
+
+
+def generate_upgrader_patch(content, file_path):
+    print(f"[*] Upgrader active: Rewriting unsafe sinks in {file_path}")
+    patched_content = content.replace("os.system(", "subprocess.run(shlex.split(")
+
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(patched_content)
+    return True
+
+
+def ensure_local_repository(target, workspace_root="./tmp"):
+    if target.get("local_path"):
+        return target["local_path"]
+
+    local_dir = os.path.join(workspace_root, target["name"].replace("/", "_"))
+    if not os.path.exists(local_dir):
+        print(f"[*] Cloning remote repo {target['name']} to {local_dir}...")
+        git.Repo.clone_from(target["clone_url"], local_dir)
+    else:
+        print(f"[*] Using existing cloned repo at {local_dir}")
+        try:
+            repo = git.Repo(local_dir)
+            repo.remotes.origin.pull()
+        except Exception:
+            pass
+
+    return local_dir
+
+
+def deploy_remediation(local_repo, repo_info):
+    try:
+        repo = git.Repo(local_repo)
+        new_branch = repo.create_head("security/automated-patch-upgrade")
+        new_branch.checkout()
+
+        repo.git.add(A=True)
+        repo.index.commit("security: automated upgrade to fix zero-day injection vulnerability")
+        print("[+] Success: Upgraded codebase ready for Pull Request generation.")
+    except Exception as e:
+        print(f"[-] Failed deployment: {e}")
+
+
+def run_pipeline(mode="mixed", local_root=".", query_limit=2):
+    targets = get_targets(mode=mode, local_root=local_root, query_limit=query_limit)
+
+    for target in targets:
+        local_dir = ensure_local_repository(target)
+        if not local_dir:
+            continue
+
+        print(f"\n[+] Processing Target: {target['name']}")
+        source_files = compile_and_extract_ast(local_dir)
+
+        for file in source_files:
+            vulnerable, raw_code = zero_day_scanner(file)
+            if vulnerable:
+                patched = generate_upgrader_patch(raw_code, file)
+                if patched:
+                    deploy_remediation(local_dir, target)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run the AFKO local-first pipeline.")
+    parser.add_argument("--mode", choices=["local", "github", "mixed"], default=os.getenv("AFKO_PIPELINE_MODE", "mixed"))
+    parser.add_argument("--local-root", default=os.getenv("AFKO_LOCAL_REPO_ROOT", "."))
+    parser.add_argument("--query-limit", type=int, default=2)
+    args = parser.parse_args()
+
+    run_pipeline(mode=args.mode, local_root=args.local_root, query_limit=args.query_limit)
+
+def generate_upgrader_patch(content, file_path):
+    """
+    4. UPGRADER/PATCHER: Automatically rewrites vulnerable code blocks safely.
+    """
+    print(f"[*] Upgrader active: Rewriting unsafe sinks in {file_path}")
+    # Replace dangerous os.system calls with safe list-based subprocess executions
+    patched_content = content.replace("os.system(", "subprocess.run(shlex.split(")
+    
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(patched_content)
+    return True
+
+def deploy_remediation(local_repo, repo_info):
+    """
+    5. DEPLOYER: Pushes the upgraded changes to an independent branch.
+    """
+    try:
+        repo = git.Repo(local_repo)
+        new_branch = repo.create_head("security/automated-patch-upgrade")
+        new_branch.checkout()
+        
+        repo.git.add(A=True)
+        repo.index.commit("security: automated upgrade to fix zero-day injection vulnerability")
+        print(f"[+] Success: Upgraded codebase ready for Pull Request generation.")
+    except Exception as e:
+        print(f"[-] Failed deployment: {e}")
+
+def run_pipeline():
+    targets = crawl_target_repositories(language="python", query_limit=2)
+    
+    for target in targets:
+        local_dir = f"./tmp/{target['name'].replace('/', '_')}"
+        print(f"\n[+] Processing Target: {target['name']}")
+        
+        # Clone repo
+        if not os.path.exists(local_dir):
+            git.Repo.clone_from(target["clone_url"], local_dir)
+            
+        source_files = compile_and_extract_ast(local_dir)
+        
+        for file in source_files:
+            vulnerable, raw_code = zero_day_scanner(file)
+            if vulnerable:
+                patched = generate_upgrader_patch(raw_code, file)
+                if patched:
+                    deploy_remediation(local_dir, target)
+
+if __name__ == "__main__":
+    run_pipeline()

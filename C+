@@ -1,0 +1,82 @@
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <cuda_runtime.h>
+#include <nvml.h> // NVIDIA Management Library for hardware telemetry
+
+struct Fraction {
+    uint64_t num;
+    uint64_t den;
+};
+
+__global__ void fractran_plct_kernel(uint64_t* d_state, const Fraction* d_fractions, int num_fractions, int max_steps);
+uint64_t map_nucleotide_to_prime(char base);
+
+// Dynamic tuner leveraging real-time NVML hardware metrics
+Fraction get_dynamic_recovery_fraction() {
+    nvmlInit();
+    nvmlDevice_t device;
+    nvmlDeviceGetHandleByIndex(0, &device); // Target primary GPU
+    
+    unsigned int temperature = 0;
+    nvmlDeviceGetTemperature(device, NVML_TEMPERATURE_GPU, &temperature);
+    nvmlShutdown();
+
+    std::cout << "[TELEMETRY MONITOR] Current GPU Temperature: " << temperature << "C" << std::endl;
+
+    // Shift fraction powers dynamically based on thermal limits
+    if (temperature < 70) {
+        std::cout << "[TUNING] Safe thermals. Running AGGRESSIVE Structural Recovery (324 / 5)." << std::endl;
+        return Fraction{324, 5}; // 2² * 3⁴ / 5¹
+    } else {
+        std::cout << "[TUNING] Thermal ceiling reached. Throttling to CONSERVATIVE Recovery (6 / 25)." << std::endl;
+        return Fraction{6, 25};  // 2¹ * 3¹ / 5²
+    }
+}
+
+int main(int argc, char* argv[]) {
+    if (argc < 2) return 1;
+
+    std::ifstream file(argv[1]);
+    std::string sequence;
+    std::getline(file, sequence);
+    file.close();
+
+    uint64_t initial_state = 1;
+    for (char base : sequence) {
+        uint64_t prime_factor = map_nucleotide_to_prime(base);
+        if (initial_state < (0xFFFFFFFFFFFFFFFF / prime_factor)) { 
+            initial_state *= prime_factor;
+        } else { break; }
+    }
+
+    // Evaluate live hardware state before allocating fraction arrays
+    Fraction recovery_fraction = get_dynamic_recovery_fraction();
+
+    std::vector<Fraction> h_fractions = {
+        {11 * 13, 2 * 7}, 
+        {49 * 5,  3},     
+        {1,       11 * 13},
+        recovery_fraction // Dynamic Recovery Fraction injected directly into Warp 
+    };
+
+    uint64_t* d_state;
+    Fraction* d_fractions;
+    cudaMalloc(&d_state, sizeof(uint64_t));
+    cudaMalloc(&d_fractions, h_fractions.size() * sizeof(Fraction));
+
+    cudaMemcpy(d_state, &initial_state, sizeof(uint64_t), cudaMemcpyHostToDevice);
+    cudaMemcpy(h_fractions.data(), h_fractions.size() * sizeof(Fraction), cudaMemcpyHostToDevice);
+
+    fractran_plct_kernel<<<1, 1>>>(d_state, d_fractions, h_fractions.size(), 10000);
+    cudaDeviceSynchronize();
+
+    uint64_t final_state;
+    cudaMemcpy(&final_state, d_state, sizeof(uint64_t), cudaMemcpyDeviceToHost);
+    std::cout << "[COMPUTE COMPLETE] Final Stable State Vector N': " << final_state << std::endl;
+
+    cudaFree(d_state);
+    cudaFree(d_fractions);
+    return 0;
+}

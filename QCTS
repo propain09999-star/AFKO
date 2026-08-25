@@ -1,0 +1,158 @@
+import abc
+import json
+import sqlite3
+from typing import Dict, Any
+
+# ==========================================================
+# 1. CORE DOMAIN: IMMUTABLE STATE AND OUTBOUND PORTS (INTERFACES)
+# ==========================================================
+
+class SanitizedUserPayload:
+    """An immutable, strictly-typed data structure representing verified runtime data."""
+    def __init__(self, user_id: int, access_level: str):
+        if not isinstance(user_id, int):
+            raise TypeError("Domain Violation: user_id must be a strict integer.")
+        if access_level not in ["USER", "MANAGER", "ADMIN"]:
+            raise ValueError(f"Domain Violation: Invalid system privilege level: {access_level}")
+            
+        self.user_id: int = user_id
+        self.access_level: str = access_level
+
+
+class DatabasePersistencePort(abc.ABC):
+    """The Outbound Port interface. The core logic calls this to persist data."""
+    @abc.abstractmethod
+    def save_audit_log(self, payload: SanitizedUserPayload) -> None:
+        """Persists tracking actions safely."""
+        pass
+
+
+# ==========================================================
+# 2. OUTBOUND ADAPTER A: THE RELATIONAL DB GUARD (SQLITE)
+# ==========================================================
+
+class RelationalDatabaseAdapter(DatabasePersistencePort):
+    """Implements SQL-specific defenses using hard parameter bindings."""
+    def __init__(self, db_connection: sqlite3.Connection):
+        self.conn = db_connection
+        self._initialize_schema()
+
+    def _initialize_schema(self):
+        """Build up an isolated internal table structure."""
+        with self.conn:
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS security_audit_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    access_level TEXT NOT NULL
+                )
+            """)
+
+    def save_audit_log(self, payload: SanitizedUserPayload) -> None:
+        """
+        Saves user state to SQL. Uses strict parameter-binding arrays to 
+        neutralize polyglot text strings containing SQL keywords.
+        """
+        # DEFENSE: NEVER execute "f'INSERT INTO logs VALUES ({payload.user_id})'"
+        # Query parameterization tells the engine to treat values as string arrays, not executable commands.
+        sql_query = "INSERT INTO security_audit_logs (user_id, access_level) VALUES (?, ?)"
+        
+        with self.conn:
+            self.conn.execute(sql_query, (payload.user_id, payload.access_level))
+
+
+# ==========================================================
+# 3. OUTBOUND ADAPTER B: THE NOSQL KEY-VALUE GUARD (MOCK REDIS)
+# ==========================================================
+
+class NoSqlKeyValueAdapter(DatabasePersistencePort):
+    """Implements NoSQL defenses against structural array injection attacks."""
+    def __init__(self):
+        # Simulation of a high-speed runtime memory database (like Redis)
+        self._datastore: Dict[str, str] = {}
+
+    def save_audit_log(self, payload: SanitizedUserPayload) -> None:
+        """
+        Serializes user payloads into a strict, predictable flat string pattern.
+        This blocks attackers from injecting unexpected embedded dictionary objects.
+        """
+        cache_key = f"session:user:{payload.user_id}"
+        
+        # DEFENSE: Force data serialization into an un-executable string shape.
+        # NoSQL databases are vulnerable to object injection if unstructured dict arrays are sent.
+        serialized_value = json.dumps({
+            "uid": payload.user_id,
+            "role": payload.access_level
+        })
+        
+        self._datastore[cache_key] = serialized_value
+
+    def verify_cache_payload(self, user_id: int) -> str:
+        """Utility function to view the raw storage state."""
+        return self._datastore.get(f"session:user:{user_id}", "{}")
+
+
+# ==========================================================
+# 4. SYSTEM COORDINATOR: CORE SECURITY SYSTEM
+# ==========================================================
+
+class SecurityControlCore:
+    """The central core logic engine. Coordinates data to multiple ports."""
+    def __init__(self, sql_adapter: DatabasePersistencePort, nosql_adapter: DatabasePersistencePort):
+        self.sql_db = sql_adapter
+        self.nosql_db = nosql_adapter
+
+    def process_system_access(self, payload: SanitizedUserPayload) -> str:
+        """Triggers simultaneous updates across the polyglot persistence matrix."""
+        
+        # Step 1: Commit strictly parameter-bound structure to the Relational DB
+        self.sql_db.save_audit_log(payload)
+        
+        # Step 2: Push sanitized, serialized hash map to the Key-Value NoSQL engine
+        self.nosql_db.save_audit_log(payload)
+        
+        return f"Successfully recorded state globally for User ID: {payload.user_id}."
+
+
+# ==========================================================
+# 5. TESTING EXECUTION ENGINE
+# ==========================================================
+if __name__ == "__main__":
+    print("--- Initializing Polyglot Persistence Architecture Verification ---\n")
+
+    # Setup isolated memory instances of our database targets
+    mock_sql_connection = sqlite3.connect(":memory:")
+    sql_adapter = RelationalDatabaseAdapter(mock_sql_connection)
+    nosql_adapter = NoSqlKeyValueAdapter()
+
+    # Link Outbound Adapters to the System Core Logic
+    core_system = SecurityControlCore(sql_adapter=sql_adapter, nosql_adapter=nosql_adapter)
+
+    # ----------------------------------------------------------------------
+    # SCENARIO: Simulating safe handling of an aggressive injection payload
+    # ----------------------------------------------------------------------
+    # An attacker attempts to inject a SQL string and a NoSQL nested dictionary.
+    # The Inbound Adapter has already blocked text payloads, forcing the domain state
+    # into a strictly-typed SanitizedUserPayload structure (e.g., user_id=9876, role="ADMIN")
+    
+    mock_verified_payload = SanitizedUserPayload(user_id=9876, access_level="ADMIN")
+
+    print("[*] Core Core execution: Distributing data to multi-database targets...")
+    execution_status = core_system.process_system_access(mock_verified_payload)
+    print(f"[+] System Response: {execution_status}\n")
+
+    # Verify Relational Database output integrity
+    print("[*] Inspecting Relational Storage Tables (SQLite):")
+    cursor = mock_sql_connection.cursor()
+    cursor.execute("SELECT * FROM security_audit_logs")
+    rows = cursor.fetchall()
+    for row in rows:
+        print(f"    -> SQL Row Extracted: ID={row[0]}, UserID={row[1]} (Type: {type(row[1])}), Role={row[2]}")
+
+    # Verify NoSQL Database output integrity
+    print("\n[*] Inspecting NoSQL Key-Value Cache States (Redis Simulation):")
+    raw_cache = nosql_adapter.verify_cache_payload(9876)
+    print(f"    -> Key-Value Entry: {raw_cache}")
+
+    print("\n[+] SUCCESS: Outbound boundary interfaces enforced schema-safe types to backend servers.")
+    mock_sql_connection.close()

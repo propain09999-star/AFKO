@@ -1,0 +1,113 @@
+import os
+import subprocess
+import shutil
+import git
+from openai import OpenAI
+
+# Initialize AI Client
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", "your-api-key"))
+
+class PolyglotSecurityAgent:
+    def __init__(self, target_url, working_dir="./sandbox"):
+        self.target_url = target_url
+        self.working_dir = working_dir
+        self.repo_name = target_url.split("/")[-1].replace(".git", "")
+        self.repo_path = os.path.join(self.working_dir, self.repo_name)
+
+    def fetch_repository_via_git(self):
+        """
+        No API Required: Directly clones via raw Git protocol. 
+        Works on Bitbucket, Codeberg, or any private Git URL.
+        """
+        print(f"[*] Raw cloning repository: {self.target_url}")
+        if os.path.exists(self.repo_path):
+            shutil.rmtree(self.repo_path)
+        git.Repo.clone_from(self.target_url, self.repo_path)
+        return self.repo_path
+
+    def polyglot_file_crawler(self):
+        """
+        Crawls and groups code files by language extensions.
+        """
+        extensions = {
+            '.py': 'Python', '.js': 'JavaScript', '.go': 'Go',
+            '.rs': 'Rust', '.java': 'Java', '.cpp': 'C++'
+        }
+        manifest = {lang: [] for lang in extensions.values()}
+        
+        for root, _, files in os.walk(self.repo_path):
+            if ".git" in root: continue
+            for file in files:
+                _, ext = os.path.splitext(file)
+                if ext in extensions:
+                    manifest[extensions[ext]].append(os.path.join(root, file))
+        return manifest
+
+    def engine_static_semgrep(self, file_path, language):
+        """
+        ENGINE 1: Static Rules. Uses Semgrep to instantly catch known flaws.
+        """
+        print(f"[*] Engine 1 (Semgrep) scanning {language} file: {file_path}")
+        # Simplification: Look for raw dangerous evaluation sinks across polyglot files
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            code = f.read()
+        
+        dangerous_sinks = ["eval(", "exec(", "system(", "child_process", "unsafe.Pointer"]
+        return any(sink in code for sink in dangerous_sinks), code
+
+    def engine_ai_zero_day(self, code_snippet, language):
+        """
+        ENGINE 2: AI Engine. Looks for complex multi-file logic flaws (Zero-Days).
+        """
+        print(f"[~] Engine 2 (AI) auditing {language} logic for novel zero-days...")
+        prompt = f"""
+        Analyze this {language} module for zero-day vulnerabilities or severe design-logic flaws.
+        If a bug exists, output exactly: 'VULNERABLE| <remediation code>'.
+        If secure, output: 'SECURE'.
+        
+        Code:
+        {code_snippet}
+        """
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0
+        )
+        result = response.choices[0].message.content.strip()
+        if result.startswith("VULNERABLE"):
+            patched_code = result.split("|")[-1].strip()
+            return True, patched_code
+        return False, None
+
+    def execute_pipeline(self):
+        self.fetch_repository_via_git()
+        code_manifest = self.polyglot_file_crawler()
+
+        for language, files in code_manifest.items():
+            for file in files:
+                # 1. Run Static Engine
+                is_suspicious, raw_code = self.engine_static_semgrep(file, language)
+                
+                if is_suspicious:
+                    # 2. Corroborate with AI Engine to prevent false positives and find patches
+                    is_zero_day, patch = self.engine_ai_zero_day(raw_code, language)
+                    if is_zero_day:
+                        print(f"[!] ZERO-DAY CONFIRMED in {file} ({language}). Applying Upgrader Patch...")
+                        with open(file, "w", encoding="utf-8") as f:
+                            f.write(patch)
+                        self.push_upgraded_code()
+
+    def push_upgraded_code(self):
+        """
+        Commits changes locally. Can push back via SSH keys to your target platform.
+        """
+        repo = git.Repo(self.repo_path)
+        repo.git.add(A=True)
+        repo.index.commit("security: patched zero-day validation vulnerabilities")
+        print("[+] Upgrade complete. Patch saved to local secure branch.")
+
+if __name__ == "__main__":
+    # Test using an alternative platform repo (Codeberg example)
+    target = "https://codeberg.org"
+    agent = PolyglotSecurityAgent(target)
+    agent.execute_pipeline()

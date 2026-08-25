@@ -1,0 +1,67 @@
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Instant, Duration};
+
+pub struct CircuitBreaker {
+    is_tripped: AtomicBool,
+    failure_count: std::sync::atomic::AtomicU32,
+    threshold: u32,
+    cooldown_period: Duration,
+    last_trip_time: std::sync::Mutex<Option<Instant>>,
+}
+
+impl CircuitBreaker {
+    pub fn new(threshold: u32, cooldown_seconds: u64) -> Self {
+        Self {
+            is_tripped: AtomicBool::new(false),
+            failure_count: std::sync::atomic::AtomicU32::new(0),
+            threshold,
+            cooldown_period: Duration::from_secs(cooldown_seconds),
+            last_trip_time: std::sync::Mutex::new(None),
+        }
+    }
+
+    /// Monitors network execution blocks before firing to free APIs
+    pub fn execute<F, T>(&self, api_node_call: F) -> Result<T, String>
+    where
+        F: FnOnce() -> Result<T, String>,
+    {
+        // 1. Amygdala Check: Is the survival network currently locked down?
+        if self.is_tripped.load(Ordering::Relaxed) {
+            let mut last_trip = self.last_trip_time.lock().unwrap();
+            if let Some(instant) = *last_trip {
+                if instant.elapsed() > self.cooldown_period {
+                    // Cooldown passed, attempt systemic tissue regeneration (Half-Open state)
+                    println!("Amygdala: Attempting partial connection to check network pulse.");
+                    *last_trip = None;
+                    self.is_tripped.store(false, Ordering::Relaxed);
+                    self.failure_count.store(0, Ordering::Relaxed);
+                } else {
+                    return Err("Systemic Lockdown: Circuit breaker is closed. Rerouting traffic via alternative synapses.".to_string());
+                }
+            }
+        }
+
+        // 2. Run the actual network operation
+        match api_node_call() {
+            Ok(data) => {
+                // Success reduces the immediate cellular stress metrics
+                self.failure_count.store(0, Ordering::Relaxed);
+                Ok(data)
+            }
+            Err(error_msg) => {
+                // Failure increases systemic response metrics
+                let current_failures = self.failure_count.fetch_add(1, Ordering::Relaxed) + 1;
+                println!("Warning: Synaptic failure logged. Metric counter: {}/{}", current_failures, self.threshold);
+
+                if current_failures >= self.threshold {
+                    println!("CRITICAL: Amygdala threat threshold breached. Closing network pathways immediately.");
+                    self.is_tripped.store(true, Ordering::Relaxed);
+                    if let Ok(mut last_trip) = self.last_trip_time.lock() {
+                        *last_trip = Some(Instant::now());
+                    }
+                }
+                Err(error_msg)
+            }
+        }
+    }
+}

@@ -1,0 +1,61 @@
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
+#include <stdint.h>
+
+// Struct to represent a FRACTRAN fraction: numerator / denominator
+struct Fraction {
+    uint64_t num;
+    uint64_t den;
+};
+
+// Device helper function for fast Mod-9 digital root evaluation
+__device__ __forceinline__ uint64_t mod9_ouroboros(uint64_t n) {
+    if (n == 0) return 0;
+    uint64_t rem = n % 9;
+    return (rem == 0) ? 9 : rem;
+}
+
+__global__ void fractran_plct_kernel(uint64_t* d_state, const Fraction* d_fractions, int num_fractions, int max_steps) {
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    // Load local thread state into ultra-fast GPU register files
+    uint64_t current_state = d_state[tid];
+    
+    for (int step = 0; step < max_steps; ++step) {
+        bool fraction_applied = false;
+        
+        // Loop through the ordered FRACTRAN list
+        for (int i = 0; i < num_fractions; ++i) {
+            Fraction f = d_fractions[i];
+            
+            // Check divisibility without floating point operations
+            if (current_state % f.den == 0) {
+                // Perform exact prime fraction multiplication
+                current_state = (current_state / f.den) * f.num;
+                fraction_applied = true;
+                break; // Jump instantly back to the top of the fraction list
+            }
+        }
+        
+        // If no fractions match, the algorithm halts naturally
+        if (!fraction_applied) break;
+        
+        // Enforce the Ouroboros constraint on Register 7 (Mod-9 anchor)
+        // Extracting, processing, and re-injecting the Mod-9 vortex phase
+        if (current_state % 7 == 0) {
+            uint64_t temp_state = current_state;
+            uint64_t seven_exponent = 0;
+            while (temp_state % 7 == 0) {
+                seven_exponent++;
+                temp_state /= 7;
+            }
+            uint64_t dynamic_phase = mod9_ouroboros(seven_exponent);
+            
+            // Re-stabilize state with the new digital root vector
+            current_state = temp_state * (7 * dynamic_phase);
+        }
+    }
+    
+    // Stream mutated integer state directly back to the VRAM global memory array
+    d_state[tid] = current_state;
+}

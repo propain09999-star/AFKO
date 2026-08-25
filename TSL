@@ -1,0 +1,55 @@
+// npm install @grpc/proto-loader @grpc/grpc-js axios
+import axios from 'axios';
+
+// Mocking the structure dictated by our Protobuf DNA definitions
+interface ApiPayload {
+    sourceApiName: string;
+    urlEndpoint: string;
+    rawBytes: Buffer;
+    capturedTimestamp: number;
+}
+
+export class SensoryWorkerArray {
+    private apiRegistry: Record<string, string> = {
+        "BinancePublicTickerAPI": "https://binance.com",
+        "CoinGeckoFreeTier": "https://coingecko.com",
+        "WikipediaTextExtractor": "https://wikipedia.org"
+    };
+
+    /**
+     * Simultaneously fires requests out to the web across designated neural pathways
+     */
+    async gatherSensoryData(targetNodes: string[]): Promise<ApiPayload[]> {
+        const fetchPromises = targetNodes.map(async (nodeName) => {
+            const endpoint = this.apiRegistry[nodeName];
+            if (!endpoint) {
+                throw new Error(`Synapse Error: Unmapped data source requested: ${nodeName}`);
+            }
+
+            try {
+                // Fetch the raw payload from the free external internet API
+                const response = await axios.get(endpoint, { responseType: 'arraybuffer', timeout: 4000 });
+                
+                // Package the raw unstructured matter into our DNA structure layout
+                return {
+                    sourceApiName: nodeName,
+                    urlEndpoint: endpoint,
+                    rawBytes: Buffer.from(response.data),
+                    capturedTimestamp: Date.now()
+                };
+            } catch (error: any) {
+                console.error(`Sensory Failure at node [${nodeName}]: ${error.message}`);
+                // Return an explicit error payload for the Rust Chaperone/Amygdala to catch
+                return {
+                    sourceApiName: nodeName,
+                    urlEndpoint: endpoint,
+                    rawBytes: Buffer.from(JSON.stringify({ error: "TIMEOUT_OR_DISCONNECT", status: error.response?.status })),
+                    capturedTimestamp: Date.now()
+                };
+            }
+        });
+
+        // Parallel execution mimicking sensory axons firing at once
+        return Promise.all(fetchPromises);
+    }
+}

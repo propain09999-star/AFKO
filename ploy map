@@ -1,0 +1,21 @@
+rules:
+  - id: python-untrusted-command-injection
+    pattern: os.system($ARG)
+    message: "Critical structural security risk: Unvalidated OS instruction layer execution."
+    languages: [python]
+    severity: ERROR
+
+  - id: go-command-injection
+    pattern: exec.Command($SHELL, $ARG)
+    metavariable-regex:
+      metavariable: $SHELL
+      regex: '("sh"|"bash"|"cmd"|"/bin/sh")'
+    message: "Critical structural security risk: Direct shell spawning detected."
+    languages: [go]
+    severity: ERROR
+
+  - id: javascript-dynamic-evaluation
+    pattern: eval($CODE)
+    message: "Critical logic injection: Dynamic string code compilation risk found."
+    languages: [javascript]
+    severity: ERROR

@@ -1,0 +1,38 @@
+import time
+import json
+from web3 import Web3
+
+class HeadlessBlockchainValidator:
+    def __init__(self):
+        # Using a public, unauthenticated Sepolia testnet RPC endpoint
+        self.rpc_url = "https://ankr.com"
+        self.w3 = Web3(Web3.HTTPProvider(self.rpc_url))
+        
+    def check_network_resonance(self):
+        """Validates connection state to the decentralized cluster."""
+        if self.w3.is_connected():
+            block_number = self.w3.eth.block_number
+            gas_price = self.w3.eth.gas_price
+            print(f"[+] Connected to Decentralized Layer (Sepolia).")
+            print(f"[+] Current Mesh Block Height: {block_number}")
+            print(f"[+] Base Gas Frequency: {self.w3.from_wei(gas_price, 'gwei')} Gwei")
+            return block_number
+        else:
+            print("[-] Dissonance Detected: Unable to bind to Web3 RPC.")
+            return None
+
+    def monitor_stream(self, cycles=3):
+        """Polls the latest block states on the network grid."""
+        print("[>] Commencing automated block verification stream...")
+        for i in range(cycles):
+            latest_block = self.check_network_resonance()
+            if latest_block:
+                # Fetch full block details including all transaction hashes
+                block_data = self.w3.eth.get_block(latest_block)
+                tx_count = len(block_data.get('transactions', []))
+                print(f"[~] Block [{latest_block}] Verified. Contained {tx_count} Transactions.")
+            time.sleep(12) # Average block mining interval timing
+
+if __name__ == "__main__":
+    validator = HeadlessBlockchainValidator()
+    validator.monitor_stream()

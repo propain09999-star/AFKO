@@ -1,0 +1,1 @@
+echo '{"node_status": "BOOTSTRAP", "available_ram_overhead_gb": 12.0, "engine_log_snapshot": "INIT"}' > ~/YOUR_REPOSITORY_NAME/kismet_runtime_config.json

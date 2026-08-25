@@ -1,0 +1,106 @@
+import asyncio
+import json
+import time
+import websockets
+
+# Unified absolute schema bridging code vulnerability and financial risk
+def create_absolute_intelligence(vector, target, event_type, details):
+    return {
+        "epoch_ms": int(time.time() * 1000),
+        "vector": vector.upper(),          # "VULN_SUPPLY_CHAIN", "KERNEL_ZERO_DAY", "TRANSCRIPT"
+        "target": target.upper(),          # "ARCH_LINUX", "NPM_REGISTRY", "FED_SPEECH"
+        "event_type": event_type.upper(),  # "ROOTKIT_DEPLOYED", "PAGE_CACHE_CORRUPTION", "SENTIMENT_SHIFT"
+        "details": details,
+        "clean_status": "PRIME_PROPHESIS"
+    }
+
+class CloudMiningHub:
+    def __init__(self, port=8765):
+        self.port = port
+        self.connected_clients = set()
+
+    async def register(self, websocket):
+        self.connected_clients.add(websocket)
+        print(f"🔌 [Cloud Box] Local ingestion node paired successfully.")
+        try:
+            await websocket.wait_closed()
+        finally:
+            self.connected_clients.remove(websocket)
+
+    async def broadcast_payload(self, payload):
+        if not self.connected_clients:
+            return
+        message = json.dumps(payload)
+        # Simultaneously send to all connected local targets
+        await asyncio.gather(*[client.send(message) for client in self.connected_clients])
+
+    async def mine_vulnerabilities(self):
+        """Zero-Browser Mining: Queries open vulnerability data feeds & bug bounties"""
+        while True:
+            try:
+                # Simulating active monitoring of the AUR package hijacking / Miasma Worm trends
+                mock_aur_intel = create_absolute_intelligence(
+                    vector="VULN_SUPPLY_CHAIN",
+                    target="ARCH_LINUX",
+                    event_type="ROOTKIT_DEPLOYED",
+                    details={
+                        "campaign": "Miasma/Phantom Gyp Variant",
+                        "malware_type": "eBPF credential stealer",
+                        "packages_compromised": 400,
+                        "exposed_secrets": ["SSH_material", "Vault_tokens", "NPM_keys"]
+                    }
+                )
+                await self.broadcast_payload(mock_aur_intel)
+                
+                # Simulating immediate detection of kernel zero-days (Copy Fail CVE-2026-31431)
+                mock_kernel_intel = create_absolute_intelligence(
+                    vector="KERNEL_ZERO_DAY",
+                    target="LINUX_KERNEL",
+                    event_type="PAGE_CACHE_CORRUPTION",
+                    details={
+                        "cve": "CVE-2026-31431",
+                        "exploit_mechanism": "AF_ALG splice() logic flaw",
+                        "impact": "Container escape & full host root execution"
+                    }
+                )
+                await self.broadcast_payload(mock_kernel_intel)
+                
+            except Exception as e:
+                print(f"⚠️ [Cloud Miner] Vulnerability stream jitter: {e}")
+            await asyncio.sleep(4) # Paced ingestion loop
+
+    async def mine_transcripts(self):
+        """Zero-Browser Mining: Hits unauthenticated public endpoints for stream logs"""
+        while True:
+            try:
+                # Simulating extraction of unedited live stream transcripts before platform sanitization
+                mock_transcript_intel = create_absolute_intelligence(
+                    vector="TRANSCRIPT",
+                    target="DEV_CORE_AUDIO",
+                    event_type="SENTIMENT_SHIFT",
+                    details={
+                        "speaker": "Lead_Maintainer_Node",
+                        "raw_quote": "The infrastructure patch timing window has dropped below 24 hours. We cannot hold the build environment.",
+                        "stress_index": 0.89
+                    }
+                )
+                await self.broadcast_payload(mock_transcript_intel)
+            except Exception as e:
+                print(f"⚠️ [Cloud Miner] Transcript loop jitter: {e}")
+            await asyncio.sleep(6)
+
+    async def start_server(self):
+        print(f"🚀 [Cloud Box] Initializing Sovereign Mining Network on port {self.port}...")
+        server = await websockets.serve(self.register, "0.0.0.0", self.port)
+        await asyncio.gather(
+            server.wait_closed(),
+            self.mine_vulnerabilities(),
+            self.mine_transcripts()
+        )
+
+if __name__ == "__main__":
+    hub = CloudMiningHub()
+    try:
+        asyncio.run(hub.start_server())
+    except KeyboardInterrupt:
+        print("🛑 [Cloud Box] Sovereign server shutdown.")

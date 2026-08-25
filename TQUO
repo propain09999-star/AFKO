@@ -1,0 +1,69 @@
+// Check for existing instances to avoid duplication
+let existingStrip = document.getElementById("jarvis-gideon-strip");
+if (existingStrip) existingStrip.remove();
+
+// Construct the Top-Quarter Display Module
+const gideonPanel = document.createElement("div");
+gideonPanel.id = "jarvis-gideon-strip";
+gideonPanel.style = "position:fixed; top:0; left:0; width:100%; height:75px; background:linear-gradient(90deg, #090d16 0%, #111827 100%); color:#00f0ff; border-bottom:2px solid #00f0ff; box-shadow: 0px 4px 20px rgba(0, 240, 255, 0.15); z-index:999999; font-family:'Courier New', monospace; padding:12px 20px; box-sizing:border-box; display:flex; justify-content:space-between; align-items:center; font-size:13px; transition: transform 0.3s ease-in-out;";
+gideonPanel.innerHTML = `
+  <div>
+    <strong style="color:#00f0ff; text-shadow: 0 0 10px #00f0ff;">🤖 GIDEON // COMPUTE PLATFORM</strong><br>
+    <span style="color:#8892b0;">Kernel Link:</span> <span id="jarvis-pulse" style="color:#50fa7b;">CONNECTED</span>
+  </div>
+  <div style="flex-grow:1; text-align:center; padding:0 40px;">
+    <span style="color:#ff79c6;">[ACTIVE MONITOR]</span> <span id="jarvis-telemetry" style="color:#f1fa8c;">Scanning hardware state...</span>
+  </div>
+  <div>
+    <input type="text" id="jarvis-terminal-input" placeholder="Command Gideon (~ to close)..." style="background:#070a12; color:#50fa7b; border:1px solid #00f0ff; padding:6px 12px; border-radius:4px; width:280px; font-family:monospace; outline:none; box-shadow: inset 0 0 5px rgba(0,240,255,0.2);">
+  </div>
+`;
+document.body.prepend(gideonPanel);
+
+// Dynamic UI update loop checking the zero-cost Python endpoint
+function syncTelemetry() {
+    fetch("http://127.0.0.1:8888")
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById("jarvis-pulse").innerText = data.Gideon_Core.toUpperCase();
+            document.getElementById("jarvis-telemetry").innerText = "Power State: " + data.Hardware_Power + " | Active Core Vectors: " + data.Active_Processes;
+        })
+        .catch(() => {
+            document.getElementById("jarvis-pulse").innerText = "OFFLINE";
+            document.getElementById("jarvis-pulse").style.color = "#ff5555";
+        });
+}
+let telemetryInterval = setInterval(syncTelemetry, 2500);
+
+// Command execution bridge mapping user text straight into raw Python execution loops
+document.getElementById("jarvis-terminal-input").addEventListener("keypress", function(e) {
+    if (e.key === "Enter") {
+        let cmdText = this.value;
+        if (!cmdText.trim()) return;
+
+        fetch("http://127.0.0.1:8888", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: cmdText })
+        })
+        .then(res => res.json())
+        .then(data => {
+            console.log("🔮 GIDEON RESPONSE:", data.feedback);
+            this.value = "";
+            syncTelemetry();
+        });
+    }
+});
+
+// Shortcut Hotkey Matrix: Press the Tilde/Backquote button (`) to seamlessly show or hide the overlay panel
+let isVisible = true;
+window.addEventListener("keydown", function(e) {
+    if (e.code === "Backquote") {
+        // Prevent typing the tilde character directly into the input field when closing
+        if (document.activeElement === document.getElementById("jarvis-terminal-input")) {
+            e.preventDefault();
+        }
+        isVisible = !isVisible;
+        gideonPanel.style.transform = isVisible ? "translateY(0)" : "translateY(-80px)";
+    }
+});

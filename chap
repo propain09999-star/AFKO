@@ -1,0 +1,37 @@
+// Cargo.toml dependencies: prost = "0.13" or similar protoc library
+use prost::Message;
+
+// Automatically generated structs from our brain_state.proto DNA file
+pub mod digital_brain {
+    include!(concat!(env!("OUT_DIR"), "/digital_brain.rs"));
+}
+
+pub struct ChaperoneValidator;
+
+impl ChaperoneValidator {
+    /// Validates the structural folding integrity of incoming network data
+    pub fn validate_and_fold(raw_bytes: &[u8]) -> Result<digital_brain::CognitiveState, String> {
+        // Unfold flat bytes into a structured Rust object via Protobuf
+        let state = digital_brain::CognitiveState::decode(raw_bytes)
+            .map_err(|e| format!("Prion Alert: Toxic misfolded byte stream payload. Error: {}", e))?;
+
+        // Chaperone Rule 1: Guard against corrupted session identities
+        if state.session_id.is_empty() {
+            return Err("Misfold Detected: Blank Session Identity string pattern found.".to_string());
+        }
+
+        // Chaperone Rule 2: Guard against downstream poison injections in raw API payloads
+        for payload in &state.raw_payloads {
+            if payload.raw_bytes.is_empty() {
+                return Err(format!("Misfold Detected: API node '{}' passed an empty binary molecule.", payload.source_api_name));
+            }
+            // Simple signature check: block raw payloads containing raw Unix exploit footprints
+            if payload.raw_bytes.windows(4).any(|window| window == b"/bin") {
+                return Err(format!("Threat Alert: Toxic bytecode sequence injected inside payload from {}", payload.source_api_name));
+            }
+        }
+
+        // Object is structurally stable, safe to emit into the deep network memory
+        Ok(state)
+    }
+}

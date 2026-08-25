@@ -1,0 +1,90 @@
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <cuda_runtime.h>
+
+// Ensure structure mirrors the GPU compilation target exactly
+struct Fraction {
+    uint64_t num;
+    uint64_t den;
+};
+
+// Forward declaration of the CUDA execution kernel
+__global__ void fractran_plct_kernel(uint64_t* d_state, const Fraction* d_fractions, int num_fractions, int max_steps);
+
+// PLCT Priming: Convert genomic character streams directly into Prime bases
+uint64_t map_nucleotide_to_prime(char base) {
+    switch (base) {
+        case 'A': return 2;  // Adenine: Base Temporal Prime
+        case 'T': return 3;  // Thymine: Sequence Structural Prime
+        case 'C': return 5;  // Cytosine: Belief/Coherence Bucket
+        case 'G': return 7;  // Guanine: Mod-9 Ouroboros Phase Anchor
+        default:  return 1;  // Skip non-coding/junk characters
+    }
+}
+
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        std::cerr << "Execution halted. Usage: " << argv[0] << " <genomic_sequence.txt>" << std::endl;
+        return 1;
+    }
+
+    // 1. Ingest raw genomic data streams
+    std::ifstream file(argv[1]);
+    if (!file.is_open()) {
+        std::cerr << "File read failure: " << argv[1] << std::endl;
+        return 1;
+    }
+
+    std::string sequence;
+    std::getline(file, sequence);
+    file.close();
+
+    // 2. Initialize Master State N via prime multiplication
+    uint64_t initial_state = 1;
+    for (char base : sequence) {
+        uint64_t prime_factor = map_nucleotide_to_prime(base);
+        if (initial_state < (0xFFFFFFFFFFFFFFFF / prime_factor)) { 
+            initial_state *= prime_factor;
+        } else {
+            break; // Bound register space safely inside 64-bit limits
+        }
+    }
+
+    std::cout << "[PLCT INITIALIZED] Master Register State N: " << initial_state << std::endl;
+
+    // 3. Define FRACTRAN Core Execution Operator Array
+    std::vector<Fraction> h_fractions = {
+        {11 * 13, 2 * 7}, // Fraction 1: Space translation
+        {49 * 5,  3},     // Fraction 2: Mod-9 Phase injection (7² = 49)
+        {1,       11 * 13},// Fraction 3: Orbifold collapse
+        {2 * 3,   5}      // Fraction 4: Register recycling
+    };
+
+    // 4. Memory Allocations: Unified VRAM Arrays
+    uint64_t* d_state;
+    Fraction* d_fractions;
+    
+    cudaMalloc(&d_state, sizeof(uint64_t));
+    cudaMalloc(&d_fractions, h_fractions.size() * sizeof(Fraction));
+
+    // Fast memory streaming to device registers
+    cudaMemcpy(d_state, &initial_state, sizeof(uint64_t), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_fractions, h_fractions.data(), h_fractions.size() * sizeof(Fraction), cudaMemcpyHostToDevice);
+
+    // 5. Fire CUDA Kernel using a single warp configuration to eliminate latency
+    std::cout << "[KERNEL START] Triggering schema-less FRACTRAN engine..." << std::endl;
+    fractran_plct_kernel<<<1, 1>>>(d_state, d_fractions, h_fractions.size(), 10000);
+    cudaDeviceSynchronize();
+
+    // 6. Retrieve transformed state directly back to Host memory space
+    uint64_t final_state;
+    cudaMemcpy(&final_state, d_state, sizeof(uint64_t), cudaMemcpyDeviceToHost);
+    std::cout << "[COMPUTE COMPLETE] Final Stable State Vector N': " << final_state << std::endl;
+
+    // Free active device hardware allocations
+    cudaFree(d_state);
+    cudaFree(d_fractions);
+    return 0;
+}

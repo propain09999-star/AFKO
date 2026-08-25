@@ -1,0 +1,133 @@
+import os
+import json
+import time
+import hmac
+import hashlib
+import threading
+import psutil
+import numpy as np
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import Tuple
+
+# The Master Cryptographic Key ensuring absolute private handshakes
+CRYPTO_KEY = b"NEUROMORPHIC_RELATIVISTIC_SECURE_TOKEN_2026"
+
+# Global System State Matrix shared between Gideon and our private API
+SHARED_TIMELINE_STATE = {
+    "system_status": "Coherent",
+    "cpu_load": 0.0,
+    "memory_load": 0.0,
+    "sub_quantum_divergence": 0.0,
+    "accumulated_savings_usd": 0.00,
+    "last_update": 0.0
+}
+state_lock = threading.Lock()
+
+class SecureGideonAPIHandler(BaseHTTPRequestHandler):
+    """A highly secure, zero-log local API router for background data queries."""
+    
+    def log_message(self, format, *args):
+        """Overrides standard console logging to keep the server completely silent."""
+        pass
+
+    def do_GET(self):
+        """Handles inbound GET requests to fetch live sub-quantum and economic data."""
+        # 1. Enforce a secure cryptographic authentication handshake via URL headers
+        auth_header = self.headers.get("X-Gideon-Token")
+        
+        # Verify the client knows our shared secret key
+        expected_token = hmac.new(CRYPTO_KEY, b"GIDEON_API_READ", hashlib.sha256).hexdigest()
+        
+        if not auth_header or not hmac.compare_digest(auth_header, expected_token):
+            self.send_response(401)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": "Unauthorized timeline access denied."}).encode())
+            return
+
+        # 2. Package and serve the live thread-safe state matrix
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")  # Allows browser interface hooks
+        self.end_headers()
+        
+        with state_lock:
+            payload = json.dumps(SHARED_TIMELINE_STATE)
+            
+        self.wfile.write(payload.encode())
+
+
+class GrandUnifiedPartnerGideon:
+    """The core execution system handling continuous fields, economics, and our custom API."""
+    def __init__(self, api_port: int = 8888):
+        self.is_running = True
+        self.api_port = api_port
+        self.baseline_state = np.ones(4, dtype=complex) / 2.0
+
+    def start_local_api_server(self):
+        """Spins up our private API endpoint on the local loopback address."""
+        server = HTTPServer(("127.0.0.1", self.api_port), SecureGideonAPIHandler)
+        print(f"📡 [PRIVATE API] Server successfully hidden on http://127.0.0.1:{self.api_port}")
+        
+        # Run the server loop in a managed state until explicitly signaled to halt
+        while self.is_running:
+            server.handle_request()
+
+    def execute_system_pulse(self):
+        """Gathers physical metrics, updates the shared memory state, and folds costs."""
+        cpu = psutil.cpu_percent()
+        mem = psutil.virtual_memory().percent
+        
+        # Calculate continuous field metrics
+        norm_factor = max(cpu + mem, 1.0)
+        live_vector = np.array([cpu/norm_factor, mem/norm_factor, 0.5, 0.5], dtype=complex)
+        if np.linalg.norm(live_vector) > 0:
+            live_vector = live_vector / np.linalg.norm(live_vector)
+            
+        overlap = np.abs(np.vdot(self.baseline_state, live_vector))**2
+        divergence = np.abs(1.0 - overlap) * 2.5
+        
+        # Simulate local compute economic savings accumulation ($0.00012 per cycle)
+        # Updates the globally accessible API dictionary safely across execution threads
+        with state_lock:
+            SHARED_TIMELINE_STATE["cpu_load"] = cpu
+            SHARED_TIMELINE_STATE["memory_load"] = mem
+            SHARED_TIMELINE_STATE["sub_quantum_divergence"] = round(divergence, 4)
+            SHARED_TIMELINE_STATE["accumulated_savings_usd"] += 0.00012
+            SHARED_TIMELINE_STATE["last_update"] = time.time()
+            if divergence > 1.2:
+                SHARED_TIMELINE_STATE["system_status"] = "Phase Mutation Warning"
+            else:
+                SHARED_TIMELINE_STATE["system_status"] = "Coherent Stable State"
+
+    def monitoring_loop(self):
+        """Background Thread: Continuous operational system evaluation loop."""
+        while self.is_running:
+            self.execute_system_pulse()
+            time.sleep(1.0)
+
+# ==========================================
+# TESTING THE BACKGROUND SERVER SYSTEM
+# ==========================================
+if __name__ == "__main__":
+    gideon_system = GrandUnifiedPartnerGideon(api_port=8888)
+    
+    # Thread 1: Start the hidden local API server
+    api_thread = threading.Thread(target=gideon_system.start_local_api_server, daemon=True)
+    api_thread.start()
+    
+    # Thread 2: Start Gideon's continuous monitoring optimization pulse
+    metrics_thread = threading.Thread(target=gideon_system.monitoring_loop, daemon=True)
+    metrics_thread.start()
+    
+    print("🔮 Gideon is now optimization-folding silently in the background.")
+    print("💡 To connect manually via your browser's console tab, send a request with header X-Gideon-Token.")
+    
+    # Keep the system running for a few seconds to initialize baseline vectors
+    try:
+        time.sleep(4)
+    except KeyboardInterrupt:
+        pass
+        
+    gideon_system.is_running = False
+    print("\n[✔] Background API processes spun down cleanly.")

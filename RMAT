@@ -1,0 +1,66 @@
+class SystemExecutionState:
+    """A unified state capsule to prevent memory allocations between steps."""
+    def __init__(self, raw_bytes):
+        self.payload = raw_bytes
+        self.is_verified = False
+        self.compiled_output = None
+        self.risk_score = 0.0
+
+class Agent1ArrayReader:
+    def execute(self, state_capsule: SystemExecutionState):
+        """Scans raw binary streams and evaluates initial array parameters."""
+        print("[Agent 1] Parsing raw binary data block into memory space...")
+        # Simulate quick structural parsing
+        if b"MALICIOUS" in state_capsule.payload:
+            state_capsule.risk_score = 0.95
+        else:
+            state_capsule.risk_score = 0.12
+
+class Agent2TokenVerifier:
+    def execute(self, state_capsule: SystemExecutionState):
+        """Enforces PQC validation token verification on the shared state matrix."""
+        print(f"[Agent 2] Evaluating risk vector score: {state_capsule.risk_score}")
+        # Enforce single bit isolation protocol check
+        if state_capsule.risk_score > 0.75:
+            print("[Agent 2 ALERT] Cryptographic mismatch flagged. Isolating pipeline execution.")
+            state_capsule.is_verified = False
+        else:
+            print("[Agent 2] PQC Token verified successfully.")
+            state_capsule.is_verified = True
+
+class Agent3CodeCompiler:
+    def execute(self, state_capsule: SystemExecutionState):
+        """Compiles output streams or applies immediate CQB lockdown maneuvers."""
+        if not state_capsule.is_verified:
+            print("[Agent 3 CQB ACTION] Terminating local thread. Flushing memory allocations.")
+            state_capsule.compiled_output = "CLEANED_AND_BLOCKED"
+        else:
+            print("[Agent 3 BUILD] Executing clean compilation step into system core...")
+            state_capsule.compiled_output = "EXECUTION_SUCCESSFUL"
+
+class SwarmOrchestrator:
+    def __init__(self):
+        self.a1 = Agent1ArrayReader()
+        self.a2 = Agent2TokenVerifier()
+        self.a3 = Agent3CodeCompiler()
+        
+    def run_pipeline(self, raw_input_bytes):
+        # Instantiate a single state container passed directly via memory pointers
+        shared_state = SystemExecutionState(raw_input_bytes)
+        
+        # Step through execution nodes without duplicating data strings
+        self.a1.execute(shared_state)
+        self.a2.execute(shared_state)
+        self.a3.execute(shared_state)
+        
+        return shared_state.compiled_output
+
+# Run the automated swarm test loops
+if __name__ == "__main__":
+    swarm = SwarmOrchestrator()
+    
+    print("--- Running Test Stream A ---")
+    swarm.run_pipeline(b"DATA_STREAM: ISO20022_MESSAGE_VALID")
+    
+    print("\n--- Running Test Stream B ---")
+    swarm.run_pipeline(b"DATA_STREAM: MALICIOUS_INJECTION_PAYLOAD")

@@ -1,0 +1,54 @@
+import time
+import json
+from web3 import Web3
+
+class SmartContractStateNotifier:
+    def __init__(self, target_wallet="0x779877A7B0D9E8603169DdbD7836e478b4624789"):
+        self.rpc_url = "https://ankr.com"
+        self.w3 = Web3(Web3.HTTPProvider(self.rpc_url))
+        self.target_address = self.w3.to_checksum_address(target_wallet)
+        
+        # Capture the baseline balance state configuration point
+        self.cached_balance = self.fetch_current_balance()
+        print(f"[+] Notification Engine Armed for: {self.target_address}")
+        print(f"[+] Initial Cached Baseline State: {self.cached_balance} ETH")
+
+    def fetch_current_balance(self) -> float:
+        """Reads raw balance metrics directly from the network ledger state."""
+        try:
+            if self.w3.is_connected():
+                raw_bal = self.w3.eth.get_balance(self.target_address)
+                return float(self.w3.from_wei(raw_bal, 'ether'))
+        except Exception as e:
+            print(f"[-] Ledger Scan Interrupted: {str(e)}")
+        return 0.0
+
+    def continuous_state_scan(self, check_intervals_sec=10, loop_cycles=3):
+        """Monitors network nodes continuously to catch state fluctuations."""
+        print(f"[>] Initializing headless event loop. Query frequency: {check_intervals_sec}s.")
+        
+        for cycle in range(loop_cycles):
+            time.sleep(check_intervals_sec)
+            fresh_balance = self.fetch_current_balance()
+            
+            if fresh_balance != self.cached_balance:
+                # Compute absolute mathematical shift bounds
+                difference = fresh_balance - self.cached_balance
+                direction = "🚨 INFLOW EVENT DETECTED" if difference > 0 else "📉 OUTFLOW EVENT DETECTED"
+                
+                print(f"\n=======================================================")
+                print(f"{direction}")
+                print(f"Wallet Modality: {self.target_address}")
+                print(f"Delta Frequency: {difference:+.6f} ETH")
+                print(f"Updated Wallet Capacity: {fresh_balance} ETH")
+                print(f"=======================================================\n")
+                
+                # Update baseline matrix cache state
+                self.cached_balance = fresh_balance
+            else:
+                print(f"[~] Scan Pass {cycle + 1} Complete: State stable at {fresh_balance} ETH.")
+
+if __name__ == "__main__":
+    # Test checking the official Sepolia LINK token contract vault for changes
+    notifier = SmartContractStateNotifier("0x779877A7B0D9E8603169DdbD7836e478b4624789")
+    notifier.continuous_state_scan(check_intervals_sec=5, loop_cycles=3)

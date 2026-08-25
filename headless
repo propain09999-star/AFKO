@@ -1,0 +1,2 @@
+pkg update && pkg upgrade -y
+pkg install python python-pip git proot-distro clang -y
