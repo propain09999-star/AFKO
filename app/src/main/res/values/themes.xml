@@ -1,0 +1,3 @@
+<resources>
+    <style name="Theme.RdpCanary" parent="Theme.MaterialComponents.DayNight.NoActionBar" />
+</resources>

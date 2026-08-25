@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">RDP Canary</string>
+    <string name="add_target">Add target</string>
+    <string name="export_csv">Export CSV</string>
+    <string name="hint_target">host or host:port (default port 3389)</string>
+</resources>
