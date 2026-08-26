@@ -21,9 +21,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
-
-        <provider
+       
+ </activity>
+<activity
+            android:name=".ChartActivity"
+            android:exported="false"
+            android:label="Response Time Chart" />
+ <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"

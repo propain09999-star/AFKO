@@ -39,7 +39,6 @@ class MainActivity : AppCompatActivity() {
         resultsList.layoutManager = LinearLayoutManager(this)
         resultsList.adapter = adapter
 
-        // Show live results as they come in
         lifecycleScope.launch {
             db.dao().observeRecentResults().collect { results ->
                 adapter.submitList(results)
@@ -62,10 +61,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        findViewById<Button>(R.id.chartButton).setOnClickListener {
+            startActivity(Intent(this, ChartActivity::class.java))
+        }
+
         schedulePeriodicChecks()
     }
 
-    /** Schedules the background TCP canary check every 15 minutes (WorkManager's minimum). */
     private fun schedulePeriodicChecks() {
         val request = PeriodicWorkRequestBuilder<RdpCanaryWorker>(15, TimeUnit.MINUTES).build()
         WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
@@ -75,8 +77,6 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    /** Writes the full result log to a CSV in cache and opens the Android Share sheet
-     *  (pick "Drive" there to save it straight to Google Drive, or any other target). */
     private suspend fun exportAndShareCsv() {
         val db = CanaryDatabase.get(applicationContext)
         val rows = db.dao().getAllResultsForExport()

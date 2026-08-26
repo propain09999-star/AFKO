@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface CanaryDao {
 
-    // --- Targets ---
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun addTarget(target: MonitorTarget)
 
@@ -23,7 +22,6 @@ interface CanaryDao {
     @Query("SELECT * FROM targets ORDER BY addedAtMs ASC")
     suspend fun getTargetsOnce(): List<MonitorTarget>
 
-    // --- Results ---
     @Insert
     suspend fun insertResult(result: CanaryResult)
 
@@ -32,6 +30,13 @@ interface CanaryDao {
 
     @Query("SELECT * FROM canary_results ORDER BY timestampMs ASC")
     suspend fun getAllResultsForExport(): List<CanaryResult>
+
+    @Query("""
+        SELECT * FROM canary_results
+        WHERE target = :target
+        ORDER BY timestampMs DESC LIMIT :limit
+    """)
+    suspend fun getRecentForTarget(target: String, limit: Int = 50): List<CanaryResult>
 
     @Query("""
         SELECT * FROM canary_results
