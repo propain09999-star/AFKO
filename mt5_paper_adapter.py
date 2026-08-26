@@ -61,7 +61,49 @@ class ExecutionResult:
     mt5_order_id: Optional[int] = None
 
 
-def connect() -> None:
+def _pip_size(symbol_info) -> float:
+    """
+    Derives the actual pip size from the symbol's digit count instead of
+    assuming a broker convention. Standard rule: 5-digit and 3-digit
+    (JPY pairs) brokers use "fractional pips" - 1 pip = 10 points.
+    4-digit and 2-digit brokers: 1 pip = 1 point. This checks the real
+    digits value from MT5 rather than guessing, so it's correct regardless
+    of which convention your specific broker uses.
+    """
+    digits = symbol_info.digits
+    point = symbol_info.point
+    if digits in (5, 3):
+        return point * 10
+    elif digits in (4, 2):
+        return point
+    else:
+        # Unusual digit count - don't silently guess, force the caller to
+        # look at it rather than risk a wrong SL/TP distance.
+        raise ValueError(
+            f"Symbol {symbol_info.name} has unexpected digits={digits} "
+            f"(point={point}). Pip size can't be safely inferred - check "
+            f"this symbol's specification manually before trading it."
+        )
+
+
+def verify_pip_size(symbol: str) -> None:
+    """
+    Standalone check you can run against any symbol before trusting this
+    adapter's SL/TP math for it. Connects, reads the symbol spec, prints
+    what pip size it derived, and disconnects. Does not place any order.
+    """
+    if not mt5.initialize():
+        raise RuntimeError(f"MT5 initialize() failed: {mt5.last_error()}")
+    try:
+        info = mt5.symbol_info(symbol)
+        if info is None:
+            print(f"Symbol {symbol} not found - check it's visible in Market Watch.")
+            return
+        pip = _pip_size(info)
+        print(f"{symbol}: digits={info.digits}, point={info.point}, derived pip size={pip}")
+        print(f"A 50-pip SL would be {50 * pip:.5f} away from entry price for this symbol.")
+    finally:
+        mt5.shutdown()
     """
     Initializes the MT5 connection and verifies the account is a demo
     account. Raises NotADemoAccountError if it isn't - this function will
@@ -114,18 +156,22 @@ def execute_order(order: OrderParams) -> ExecutionResult:
     symbol_info = mt5.symbol_info(order.symbol)
     if symbol_info is None:
         return ExecutionResult(order.trace_id, accepted=False, reason=f"unknown symbol {order.symbol}")
-    point = symbol_info.point
+
+    try:
+        pip = _pip_size(symbol_info)
+    except ValueError as e:
+        return ExecutionResult(order.trace_id, accepted=False, reason=str(e))
 
     if order.action == Action.BUY:
         price = tick.ask
         order_type = mt5.ORDER_TYPE_BUY
-        sl = price - order.sl_pips * point * 10  # *10 accounts for 5-digit brokers; verify for your broker
-        tp = price + order.tp_pips * point * 10
+        sl = price - order.sl_pips * pip
+        tp = price + order.tp_pips * pip
     else:  # SELL
         price = tick.bid
         order_type = mt5.ORDER_TYPE_SELL
-        sl = price + order.sl_pips * point * 10
-        tp = price - order.tp_pips * point * 10
+        sl = price + order.sl_pips * pip
+        tp = price - order.tp_pips * pip
 
     request = {
         "action": mt5.TRADE_ACTION_DEAL,
@@ -191,15 +237,19 @@ def _close_position(order: OrderParams) -> ExecutionResult:
 
 
 if __name__ == "__main__":
-    # Self-check only - connects, verifies demo status, prints account info,
-    # disconnects. Does NOT place any order. Run this first to confirm the
-    # demo gate works before wiring up any real strategy loop.
+    # Two modes:
+    #   python mt5_paper_adapter.py           -> demo gate self-check only
+    #   python mt5_paper_adapter.py EURUSD    -> also verify pip size for that symbol
+    # Neither mode places any order.
     try:
         connect()
         print("Demo gate check passed. No orders were placed by this self-check.")
+        if len(sys.argv) > 1:
+            print()
+            verify_pip_size(sys.argv[1])
     except NotADemoAccountError as e:
         print(f"BLOCKED: {e}")
         sys.exit(1)
     finally:
         disconnect()
-  
+   
