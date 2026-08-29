@@ -1,137 +1,119 @@
+#!/usr/bin/env python3
 """
-watch_ingest.py — polls a folder for new files and runs each one
-through classify -> route -> curate. No watchdog dependency: a simple
-poll loop is enough for a downloads folder and keeps deps minimal.
+watch_ingest.py -- polls a downloads folder for new files and runs them
+through classify -> route -> curate.
 
-Usage:
-    python watch_ingest.py [--config config.yaml] [--once]
-
---once processes whatever's currently in the folder and exits,
-instead of looping forever — useful for testing and for running via
-cron/Termux:Boot instead of a long-lived process.
+Simple polling loop (no watchdog dependency needed -- works fine over
+Termux storage). Keeps a seen-files set on disk so restarts don't
+reprocess everything.
 """
 
-import argparse
 import json
 import os
 import time
-from datetime import datetime, timezone
 
 import yaml
 
-from classify import classify_file
-from router import route
-from curate import curate, create_new_repo
+from classify import classify_text
+from router import list_existing_repos, route, create_repo
+from curate import curate
+
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
+SEEN_FILE = os.path.expanduser("~/repo-curator-staging/seen.json")
+
+TEXT_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".py", ".log"}
 
 
-def load_config(path: str) -> dict:
-    with open(path) as f:
+def load_config():
+    with open(CONFIG_PATH) as f:
         return yaml.safe_load(f)
 
 
-def log_decision(decision_log_path: str, entry: dict):
-    with open(decision_log_path, "a") as f:
-        f.write(json.dumps(entry) + "\n")
+def load_seen():
+    if not os.path.exists(SEEN_FILE):
+        return set()
+    with open(SEEN_FILE) as f:
+        return set(json.load(f))
 
 
-def process_file(file_path: str, cfg: dict) -> dict:
-    """
-    Runs one file through the full pipeline. Returns the full decision
-    record (what was classified, routed, and curated as) — this is
-    what gets written to decision_log regardless of outcome, so a
-    misclassification is debuggable after the fact.
-    """
-    record = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "file": file_path,
-    }
-
-    classification = classify_file(file_path, cfg)
-    record["classification"] = classification
-
-    if "error" in classification:
-        record["outcome"] = "classification_failed"
-        return record
-
-    routing = route(file_path, classification, cfg)
-    record["routing"] = routing
-
-    if routing["action"] == "existing_repo":
-        repo_dir = os.path.join(os.path.expanduser(cfg["repo_base_path"]), routing["repo"])
-        record["curation"] = curate(file_path, repo_dir, classification, cfg)
-        record["outcome"] = "curated"
-
-    elif routing["action"] == "pending":
-        record["outcome"] = "pending_more_files_needed"
-
-    elif routing["action"] == "needs_confirmation":
-        record["outcome"] = "awaiting_human_confirmation"
-        record["confirmation_needed_for_slug"] = routing["slug"]
-        # NOTE: this is where a real confirmation channel (ntfy.sh
-        # push, a Termux notification, a Slack message — pick one)
-        # should ask "create repo '<slug>'? y/n" and only proceed on
-        # yes. Not wired up here — see NEXT STEPS.
-
-    elif routing["action"] == "create_repo":
-        creation = create_new_repo(routing["slug"], cfg)
-        record["repo_creation"] = creation
-        if not creation.get("dry_run") and "error" not in creation:
-            repo_dir = creation["created"]
-            record["curation"] = curate(file_path, repo_dir, classification, cfg)
-        record["outcome"] = "repo_created_and_curated" if "error" not in creation else "repo_creation_failed"
-
-    return record
+def save_seen(seen):
+    os.makedirs(os.path.dirname(SEEN_FILE), exist_ok=True)
+    with open(SEEN_FILE, "w") as f:
+        json.dump(list(seen), f)
 
 
-def scan_once(cfg: dict, seen: set) -> set:
-    """Processes any new files in watch_dir not already in `seen`. Returns updated seen set."""
-    watch_dir = os.path.expanduser(cfg["watch_dir"])
-    if not os.path.isdir(watch_dir):
-        print(f"[watch_ingest] watch_dir does not exist: {watch_dir}")
-        return seen
+def read_text_safely(path):
+    ext = os.path.splitext(path)[1].lower()
+    if ext not in TEXT_EXTENSIONS:
+        return f"[binary or unsupported file: {os.path.basename(path)}]"
+    try:
+        with open(path, "r", errors="ignore") as f:
+            return f.read()
+    except Exception as e:
+        return f"[could not read file: {e}]"
 
-    for filename in os.listdir(watch_dir):
-        file_path = os.path.join(watch_dir, filename)
-        if file_path in seen or not os.path.isfile(file_path):
-            continue
-        if os.path.getsize(file_path) < cfg.get("min_file_size_bytes", 16):
-            continue  # likely still being written
 
-        print(f"[watch_ingest] processing {filename}")
-        record = process_file(file_path, cfg)
-        log_decision(cfg["decision_log"], record)
-        print(f"[watch_ingest]   -> {record['outcome']}")
+def process_file(path, cfg):
+    filename = os.path.basename(path)
+    content = read_text_safely(path)
+    existing_repos = list_existing_repos(cfg["repos_base"])
 
-        seen.add(file_path)
+    result = classify_text(
+        filename, content, existing_repos,
+        model=cfg["model"], url=cfg["ollama_url"],
+    )
+    if result is None:
+        print(f"[skip] could not classify {filename}")
+        return
 
-    return seen
+    decision = route(result, cfg["repos_base"], cfg["new_repo_threshold"])
+
+    if decision[0] == "existing":
+        repo_path = os.path.join(os.path.expanduser(cfg["repos_base"]), decision[1])
+        curate(path, repo_path, result, cfg["require_confirmation"], cfg["ntfy_topic"])
+        print(f"[curated] {filename} -> {decision[1]}")
+
+    elif decision[0] == "new_repo":
+        repo_path = create_repo(decision[1], cfg["repos_base"], cfg.get("git_remote_prefix"))
+        curate(path, repo_path, result, cfg["require_confirmation"], cfg["ntfy_topic"])
+        print(f"[new repo] {filename} -> {decision[1]}")
+
+    else:  # staged
+        staging = os.path.expanduser(cfg["staging_dir"])
+        os.makedirs(staging, exist_ok=True)
+        os.rename(path, os.path.join(staging, filename))
+        print(f"[staged {decision[2]}/{cfg['new_repo_threshold']}] {filename} -> {decision[1]}")
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="config.yaml")
-    parser.add_argument("--once", action="store_true", help="Process current files and exit, don't loop")
-    args = parser.parse_args()
+    cfg = load_config()
+    watch_dir = os.path.expanduser(cfg["watch_dir"])
+    seen = load_seen()
 
-    cfg = load_config(args.config)
+    print(f"watching {watch_dir} every {cfg['poll_seconds']}s...")
+    while True:
+        try:
+            for filename in os.listdir(watch_dir):
+                full_path = os.path.join(watch_dir, filename)
+                if full_path in seen or not os.path.isfile(full_path):
+                    continue
+                # skip files still being written (size check)
+                size1 = os.path.getsize(full_path)
+                time.sleep(1)
+                size2 = os.path.getsize(full_path)
+                if size1 != size2:
+                    continue
 
-    if cfg.get("dry_run", True):
-        print("[watch_ingest] DRY RUN — no files will be moved, no commits/pushes will happen")
+                process_file(full_path, cfg)
+                seen.add(full_path)
+                save_seen(seen)
 
-    seen = set()
+        except Exception as e:
+            print(f"[error] {e}")
 
-    if args.once:
-        scan_once(cfg, seen)
-        return
-
-    print(f"[watch_ingest] watching {cfg['watch_dir']} every {cfg['poll_interval_seconds']}s (Ctrl+C to stop)")
-    try:
-        while True:
-            seen = scan_once(cfg, seen)
-            time.sleep(cfg.get("poll_interval_seconds", 30))
-    except KeyboardInterrupt:
-        print("\n[watch_ingest] stopped.")
+        time.sleep(cfg["poll_seconds"])
 
 
 if __name__ == "__main__":
     main()
+        
