@@ -1,99 +1,88 @@
+#!/usr/bin/env python3
 """
-classify.py — asks a local Ollama model what a downloaded file is
-about, and gets back a repo slug + short summary + tags.
+classify.py -- ask a local Ollama model to classify a piece of text
+into a repo slug + short summary + tags.
 
-Same urllib pattern as extract.py in radio-sweepstakes-detector — no
-extra HTTP library dependency.
+No classes. Just functions. Import classify_text() from other scripts.
 """
 
 import json
-import os
-import urllib.request
-import urllib.error
+import re
+import requests
+
+OLLAMA_URL = "http://localhost:11434/api/generate"
+MODEL = "tinyllama"
+
+PROMPT_TEMPLATE = """You are sorting a file into a project repo.
+
+Existing repos: {existing_repos}
+
+File name: {filename}
+File content (truncated):
+---
+{content}
+---
+
+Reply with ONLY a JSON object, no other text, in this exact shape:
+{{"repo_slug": "short-kebab-case-name", "summary": "one sentence summary", "tags": ["tag1", "tag2"], "is_existing": true or false}}
+
+If the file clearly belongs to one of the existing repos, set is_existing to true
+and repo_slug to that repo's exact name. Otherwise pick a new short kebab-case slug
+and set is_existing to false.
+"""
 
 
-CLASSIFY_PROMPT = """You are sorting a downloaded file into a project/topic \
-so it can be filed into the right repo.
-
-Filename: {filename}
-Content preview (may be empty if not a text file):
-\"\"\"{content_preview}\"\"\"
-
-Reply with ONLY a JSON object (no other text, no markdown formatting):
-{{
-  "slug": "short-lowercase-hyphenated-topic-name",
-  "summary": "one sentence describing what this file is",
-  "tags": ["tag1", "tag2"]
-}}
-
-JSON:"""
-
-
-def read_text_preview(file_path: str, text_extensions: list, max_chars: int = 2000) -> str:
-    """
-    Returns the first max_chars of a file's content if it's a
-    recognized text extension, otherwise an empty string — classifying
-    by filename alone for anything else (PDFs, images, etc. aren't
-    extracted here yet).
-    """
-    ext = os.path.splitext(file_path)[1].lower()
-    if ext not in text_extensions:
-        return ""
+def _extract_json(text):
+    """Ollama sometimes wraps JSON in extra text -- pull out the first {...} block."""
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if not match:
+        return None
     try:
-        with open(file_path, "r", errors="ignore") as f:
-            return f.read(max_chars)
-    except OSError:
-        return ""
+        return json.loads(match.group(0))
+    except json.JSONDecodeError:
+        return None
 
 
-def classify_file(file_path: str, cfg: dict) -> dict:
-    """
-    Returns {"slug": str, "summary": str, "tags": [str]} or
-    {"error": str} if the call fails or the response isn't valid JSON.
-    Never raises — a classification failure should route the file to
-    the pending/manual-review pile, not crash the watch loop.
-    """
-    filename = os.path.basename(file_path)
-    content_preview = read_text_preview(file_path, cfg.get("text_extensions", []))
-
-    prompt = CLASSIFY_PROMPT.format(filename=filename, content_preview=content_preview)
-
-    payload = json.dumps({
-        "model": cfg["model"],
-        "prompt": prompt,
-        "stream": False,
-        "options": {"temperature": 0.1},
-    }).encode("utf-8")
-
-    req = urllib.request.Request(
-        f"{cfg['ollama_host']}/api/generate",
-        data=payload,
-        headers={"Content-Type": "application/json"},
+def classify_text(filename, content, existing_repos, model=MODEL, url=OLLAMA_URL, timeout=300):
+    """Returns dict: {repo_slug, summary, tags, is_existing} or None on failure."""
+    truncated = content[:4000]  # keep it well under tinyllama's context window
+    prompt = PROMPT_TEMPLATE.format(
+        existing_repos=", ".join(existing_repos) if existing_repos else "(none yet)",
+        filename=filename,
+        content=truncated,
     )
 
-    try:
-        with urllib.request.urlopen(req, timeout=cfg.get("timeout_seconds", 60)) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError) as e:
-        return {"error": f"ollama request failed: {e}"}
+    resp = requests.post(
+        url,
+        json={"model": model, "prompt": prompt, "stream": False},
+        timeout=timeout,
+    )
+    resp.raise_for_status()
+    raw = resp.json().get("response", "")
 
-    raw_output = body.get("response", "").strip()
+    result = _extract_json(raw)
+    if result is None:
+        return None
 
-    if raw_output.startswith("```"):
-        raw_output = raw_output.strip("`")
-        if raw_output.lower().startswith("json"):
-            raw_output = raw_output[4:].strip()
-
-    try:
-        result = json.loads(raw_output)
-    except json.JSONDecodeError:
-        return {"error": "model did not return valid JSON", "raw_output": raw_output}
-
-    # Minimal sanity check — a slug with spaces/uppercase isn't
-    # usable as a directory/repo name, and this is easy to catch
-    # before it becomes a filesystem problem downstream
-    slug = result.get("slug", "")
-    if not slug or not all(c.islower() or c.isdigit() or c == "-" for c in slug):
-        return {"error": f"model returned an unusable slug: {slug!r}", "raw_output": raw_output}
-
+    # sanitize the slug regardless of what the model gave us
+    slug = result.get("repo_slug", "unsorted")
+    slug = re.sub(r"[^a-z0-9-]+", "-", slug.lower()).strip("-") or "unsorted"
+    result["repo_slug"] = slug
+    result.setdefault("summary", "")
+    result.setdefault("tags", [])
+    result.setdefault("is_existing", slug in existing_repos)
     return result
+
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) < 2:
+        print("usage: classify.py <file>")
+        sys.exit(1)
+
+    with open(sys.argv[1], "r", errors="ignore") as f:
+        text = f.read()
+
+    out = classify_text(sys.argv[1], text, existing_repos=[])
+    print(json.dumps(out, indent=2))
+  
