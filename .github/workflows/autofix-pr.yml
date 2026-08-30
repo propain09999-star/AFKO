@@ -1,9 +1,13 @@
-name: Autofix (opens a PR, never pushes to main)
+   name: Autofix (opens a PR, never pushes to main)
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
   autofix:
@@ -37,7 +41,7 @@ jobs:
       # This is the safety boundary: create_pull_request opens a PR for a
       # human to review and merge. It does NOT push to main, does NOT
       # merge automatically, and does NOT run again on its own output
-      # (see the `if:` guard above). If you ever consider changing this
+      # (see the 'if:' guard above). If you ever consider changing this
       # step to push straight to main instead, don't - see the project's
       # notes on why autonomous unsupervised patches are excluded here.
       - name: Open PR with fixes
@@ -53,4 +57,4 @@ jobs:
             automated formatters are usually safe, but this project keeps a
             human in the loop for every change, no exceptions.
           branch: autofix/lint-formatting
-          delete-branch: true
+          delete-branch: true   
