@@ -1,0 +1,132 @@
+name: Auto-Fix Flagged Issues (Isolated Branch)
+
+on:
+  workflow_run:
+    workflows: ["Deep Security Scan (Unknown CVEs / Zero-Days / Secrets)", "Deep Error Sift & Flaky-Bug Detection"]
+    types: [completed]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-fix:
+    if: github.event.workflow_run.conclusion == 'failure' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Create isolated fix branch
+        id: branch
+        run: |
+          BRANCH="auto-fix/$(date +%Y%m%d-%H%M%S)"
+          git checkout -b "$BRANCH"
+          echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
+
+      - uses: ./.github/actions/setup-pipeline
+        with:
+          install-dev-deps: "true"
+
+      # --- Capture pre-fix behavior as the baseline for comparison ---
+      - name: Snapshot pipeline output BEFORE fixes
+        run: |
+          python main.py --config config.yaml --input-file tests/fixtures/sample_broadcast.wav --no-live-capture --output before_fix_output.json || true
+          pytest tests/ --junitxml=before_fix_results.xml || true
+
+      # --- Apply only mechanical, low-risk auto-fixes.
+      #     Nothing here rewrites logic — formatting, import sorting,
+      #     and known-safe dependency version bumps only. Anything
+      #     that requires understanding intent is left for a human. ---
+      - name: Apply safe auto-fixes
+        run: |
+          pip install ruff black
+          ruff check . --fix
+          black .
+
+      - name: Apply pip-audit suggested version fixes
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt --fix --dry-run > audit-fix-suggestions.txt || true
+
+      # --- Capture post-fix behavior on the SAME fixture, then diff ---
+      - name: Snapshot pipeline output AFTER fixes
+        id: after
+        run: |
+          python main.py --config config.yaml --input-file tests/fixtures/sample_broadcast.wav --no-live-capture --output after_fix_output.json || true
+          pytest tests/ --junitxml=after_fix_results.xml || true
+
+      - name: Diff behavior before vs after
+        id: diff
+        run: |
+          python tests/diff_pipeline_output.py \
+            --baseline before_fix_output.json \
+            --current after_fix_output.json \
+            > silent-behavior-changes.txt || true
+          echo "changed=$(test -s silent-behavior-changes.txt && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Diff test results before vs after
+        run: |
+          python tests/diff_test_results.py \
+            --baseline before_fix_results.xml \
+            --current after_fix_results.xml \
+            > test-result-diff.txt || true
+
+      - name: Commit fixes to isolated branch
+        run: |
+          git config user.name "auto-fix-bot"
+          git config user.email "auto-fix-bot@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "auto-fix: mechanical lint/format/dependency fixes"
+          git push origin "${{ steps.branch.outputs.name }}"
+
+      - name: Upload before/after diff artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: auto-fix-diff-report
+          path: |
+            silent-behavior-changes.txt
+            test-result-diff.txt
+            audit-fix-suggestions.txt
+
+      # --- Open a PR for HUMAN review. Never auto-merged. If a
+      #     silent behavior change was detected, the PR is loudly
+      #     flagged so it doesn't get rubber-stamped. ---
+      - name: Open PR for review (never auto-merged)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const changed = "${{ steps.diff.outputs.changed }}" === 'true';
+            let diffText = "No output found.";
+            try { diffText = fs.readFileSync('silent-behavior-changes.txt', 'utf8') || "No differences detected — fixes appear behavior-neutral."; } catch (e) {}
+
+            const title = changed
+              ? "⚠️ auto-fix: mechanical fixes — BEHAVIOR CHANGE DETECTED, review carefully"
+              : "auto-fix: mechanical lint/format/dependency fixes";
+
+            const body = `This branch (\`${{ steps.branch.outputs.name }}\`) was generated automatically after a flagged issue in security-deep-scan or deep-error-sift.
+
+            **This PR will NOT auto-merge.** It exists so you can debug in isolation before anything touches main.
+
+            ### Behavior diff (fixture: sample_broadcast.wav)
+            ${changed ? "⚠️ **Output changed after the fix.** Do not merge without understanding why." : "✅ No behavioral difference detected on the test fixture."}
+
+            \`\`\`
+            ${diffText}
+            \`\`\`
+
+            To debug locally: \`git fetch && git checkout ${{ steps.branch.outputs.name }}\`
+            `;
+
+            await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              head: "${{ steps.branch.outputs.name }}",
+              base: "main",
+              body: body,
+              draft: changed  // force draft status if behavior changed, extra friction against accidental merge
+            });

@@ -1,0 +1,28 @@
+# Auto-merge policy for canary-automerge.yml
+#
+# "patch" and "minor" are semver categories, not blanket permissions —
+# a package can still require manual review even on a patch bump if
+# it's listed under always_manual_review below.
+
+allowed_update_types:
+  - "version-update:semver-patch"
+  - "version-update:semver-minor"   # now allowed, was patch-only before
+
+# Never auto-merge these regardless of bump size — e.g. anything
+# your pipeline depends on for correctness-critical behavior
+always_manual_review:
+  - ollama
+  - whisper.cpp
+
+# Packages here are trusted enough to also allow major bumps,
+# e.g. well-maintained formatting/lint tools with low blast radius
+trusted_for_major:
+  - ruff
+  - black
+
+# Auto-merge additionally requires ALL of:
+#   - canary-run job succeeded
+#   - zero behavior diff on the test fixture
+#   - security-deep-scan found no new CRITICAL/HIGH on the canary branch
+require_clean_security_scan: true
+require_zero_behavior_diff: true

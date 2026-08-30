@@ -1,0 +1,64 @@
+name: "Setup Pipeline Environment"
+description: "Installs ffmpeg, Ollama + model, and Python deps — shared by every workflow that runs the pipeline"
+
+inputs:
+  install-ollama-model:
+    description: "Whether to pull the tinyllama model (skip for jobs that don't need extraction, e.g. lint-only)"
+    required: false
+    default: "true"
+  install-dev-deps:
+    description: "Whether to also install requirements-dev.txt"
+    required: false
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+        cache: "pip"
+
+    - name: Install ffmpeg
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg
+
+    - name: Cache whisper.cpp build
+      id: cache-whisper
+      uses: actions/cache@v4
+      with:
+        path: whisper.cpp
+        key: whisper-cpp-${{ runner.os }}-v1
+
+    - name: Build whisper.cpp
+      if: steps.cache-whisper.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        git clone https://github.com/ggerganov/whisper.cpp.git
+        cd whisper.cpp
+        make
+
+    - name: Install Ollama
+      if: inputs.install-ollama-model == 'true'
+      shell: bash
+      run: curl -fsSL https://ollama.com/install.sh | sh
+
+    - name: Pull SLM model
+      if: inputs.install-ollama-model == 'true'
+      shell: bash
+      run: |
+        ollama serve &
+        sleep 5
+        ollama pull tinyllama
+
+    - name: Install Python dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        if [ "${{ inputs.install-dev-deps }}" = "true" ]; then
+          pip install -r requirements-dev.txt
+        fi

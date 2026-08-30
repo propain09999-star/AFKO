@@ -1,0 +1,50 @@
+name: Nightly End-to-End Integration Test
+
+on:
+  schedule:
+    - cron: "0 5 * * *"  # nightly — catches integration breaks unit tests miss
+  workflow_dispatch: {}
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install Ollama + pull model
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          ollama serve &
+          sleep 5
+          ollama pull tinyllama
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Runs capture -> transcribe -> detect -> extract against a
+      # canned audio file with a known sweepstakes mention baked in,
+      # and asserts the ntfy.sh notification actually fires —
+      # this is the only workflow that tests the *whole chain* together
+      - name: Run full pipeline against known-answer fixture
+        run: |
+          python main.py \
+            --config config.yaml \
+            --input-file tests/fixtures/sample_broadcast.wav \
+            --no-live-capture
+
+      - name: Verify expected detection fired
+        run: python tests/verify_e2e_output.py --expect-keyword-hit
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          curl -d "Nightly E2E test failed — pipeline chain broken" \
+            ntfy.sh/${{ secrets.NTFY_TOPIC }}

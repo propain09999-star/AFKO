@@ -85,4 +85,3 @@ if __name__ == "__main__":
 
     out = classify_text(sys.argv[1], text, existing_repos=[])
     print(json.dumps(out, indent=2))
-  

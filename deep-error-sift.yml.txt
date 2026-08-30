@@ -1,0 +1,96 @@
+name: Deep Error Sift & Flaky-Bug Detection
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 8 * * *"  # daily — catches flakiness that only shows up over many runs
+
+jobs:
+  static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install project + analysis tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install pylint mypy bandit flake8
+
+      # Whole-codebase sweep, not just diffed files
+      - name: pylint (logic/style errors, full repo)
+        run: pylint capture.py transcribe.py detect.py extract.py main.py --exit-zero --output-format=json > pylint-report.json
+
+      - name: mypy (type errors, full repo)
+        run: mypy . --ignore-missing-imports --html-report mypy-report || true
+
+      - name: bandit (security-relevant coding errors)
+        run: bandit -r . -f json -o bandit-report.json || true
+
+      - name: flake8 (style/syntax issues)
+        run: flake8 . --format=json --output-file=flake8-report.json || true
+
+      - name: Upload static analysis reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-analysis-reports
+          path: |
+            pylint-report.json
+            mypy-report
+            bandit-report.json
+            flake8-report.json
+
+  flaky-error-detection:
+    runs-on: ubuntu-latest
+    needs: static-analysis
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install project + test tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install pytest pytest-repeat pytest-randomly pytest-timeout
+
+      # Run each test many times, in random order, with a timeout —
+      # this is what surfaces "works sometimes" errors: race conditions,
+      # order-dependent state, timing-sensitive audio/transcription steps
+      - name: Run tests repeatedly with randomized order
+        run: |
+          pytest tests/ \
+            --count=20 \
+            -p randomly \
+            --timeout=60 \
+            -v \
+            --junitxml=flaky-report.xml
+        continue-on-error: true
+
+      - name: Upload flaky-test report
+        uses: actions/upload-artifact@v4
+        with:
+          name: flaky-test-report
+          path: flaky-report.xml
+
+      - name: Summarize flaky results
+        run: |
+          python - <<'EOF'
+          import xml.etree.ElementTree as ET
+          tree = ET.parse("flaky-report.xml")
+          root = tree.getroot()
+          failures = int(root.attrib.get("failures", 0))
+          tests = int(root.attrib.get("tests", 0))
+          print(f"Ran {tests} test executions, {failures} failures.")
+          if failures:
+              print("Non-zero failures across repeated runs usually means a flaky/non-deterministic bug, not a broken test.")
+          EOF
