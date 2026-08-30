@@ -5,12 +5,30 @@ A reusable set of patterns for getting reliable structured output out of a
 weak local model (tinyllama via Ollama). Built to drop into projects like
 radio-sweepstakes-detector/extract.py or repo-curator's classification step.
 
-Covers the failure modes small models hit most:
-  1. Invalid / malformed JSON
-  2. Multi-field extraction accuracy collapse
-  3. Hallucinated fields not present in the source text
-  4. Overconfident wrong answers with no way to detect them
-  5. Prompt drift on long inputs
+WEAKNESS REGISTRY -- documented failure modes for tinyllama-class (~1.1B) models,
+not just the ones observed empirically. Each maps to a mitigation below.
+
+  W1. Malformed JSON / non-compliant formatting  -> call_ollama_structured, strip_to_json
+  W2. Multi-field extraction accuracy collapse    -> extract_fields_separately
+  W3. Hallucinated values not in source text      -> is_grounded
+  W4. No reliable self-reported confidence        -> self_consistency_vote
+  W5. Mathematical / numeric reasoning is weak    -> NEVER let the model compute; extract
+      (docs confirm: strong on general language,     raw strings, do arithmetic in Python
+       weak specifically on math reasoning)
+  W6. Multi-turn / agentic task accuracy ~0%      -> NEVER build a stateful back-and-forth
+      without fine-tuning (function-calling far      plan into the model; keep every call
+       below larger small models, multi-turn ~0%)     single-shot and stateless in your code
+  W7. Self-reflection/self-critique unreliable,   -> NEVER ask the model to "check your own
+      can worsen output on complex tasks             answer" -- use is_grounded/schema checks
+                                                       (external validation) instead
+  W8. Complex/compositional instructions degrade  -> keep one instruction per prompt; never
+      faster than simple ones                        stack "extract X, and if Y then also
+                                                       check Z" in a single call
+  W9. 2K token context ceiling                    -> truncate input (already handled) +
+                                                       check done_reason for silent truncation
+  W10. Negation / absence handling is unreliable  -> always include an explicit negative
+      ("no mention of X" often misread as X)         few-shot example, never rely on
+                                                       the model inferring absence
 
 Requires: `requests` (or swap for the ollama python client if you use that)
 """
@@ -81,7 +99,7 @@ def extract_with_retry(prompt: str, schema: dict, fallback: dict, max_retries: i
     attempt_prompt = prompt
     for attempt in range(max_retries + 1):
         try:
-            raw = requests.post(
+            resp_json = requests.post(
                 OLLAMA_URL,
                 json={
                     "model": MODEL,
@@ -90,15 +108,31 @@ def extract_with_retry(prompt: str, schema: dict, fallback: dict, max_retries: i
                     "options": {"temperature": 0.0},
                 },
                 timeout=60,
-            ).json()["response"]
+            ).json()
+
+            # W9: if Ollama cut the response for hitting the token limit,
+            # the JSON may be truncated mid-object -- treat as a retry-worthy
+            # failure, not a formatting bug, and shorten the input next time.
+            if resp_json.get("done_reason") == "length":
+                attempt_prompt = _shorten_input(prompt) + REPAIR_HINT
+                continue
+
+            raw = resp_json["response"]
             cleaned = strip_to_json(raw)
             data = json.loads(cleaned)
             if _matches_schema(data, schema):
                 return data
-        except (json.JSONDecodeError, requests.RequestException):
+        except (json.JSONDecodeError, requests.RequestException, KeyError):
             pass
         attempt_prompt = prompt + REPAIR_HINT
     return fallback  # give up cleanly rather than looping forever
+
+
+def _shorten_input(prompt: str, keep_ratio: float = 0.6) -> str:
+    """Crude fallback shortening when a response was truncated (W9)."""
+    words = prompt.split()
+    cutoff = max(50, int(len(words) * keep_ratio))
+    return " ".join(words[:cutoff])
 
 
 def _matches_schema(data: dict, schema: dict) -> bool:
