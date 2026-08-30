@@ -1,28 +1,62 @@
-# AFKO
-quantum-bio-dag/
-├── README.md               # Setup instructions and dependency trees
-├── requirements.txt         # Package dependencies (qiskit, qiskit-ibm-runtime, etc.)
-├── config.json             # Node configuration & encrypted API keys
-├── core/
-│   ├── __init__.py
-│   ├── dag_engine.py       # DAG execution architecture
-│   ├── rag_engine.py       # Live genomic/calibration fetcher
-│   └── ledger.py           # Automated micro-reward tracking contract
-└── main.py                 # Central execution pipeline matrix
-# 🛸 PROJECT OUROBOROS: MULTI-SCALE QUANTUM-BIOLOGICAL DEPIN ENGINE
+# repo-curator
 
-An autonomous, multi-tenant, cloud-native Infrastructure-as-a-Service (IaaS) framework. This platform executes non-linear timeline optimization loops, post-quantum lattice security protocols, ancient structural metric scaling, and biomorphic circadian tracking matrices natively inside the digital plane.
+Watches a downloads folder, classifies new files with a local Ollama
+model, and routes them into curated git repos — creating a new repo
+once enough related files pile up.
 
----
+## Setup (Termux / proot-distro Ubuntu)
 
-## 📅 1. The All-Encompassing Biomorphic Operational Master Schedule
+```bash
+pip install requests pyyaml --break-system-packages
+```
 
-The system dynamically analyzes the universal clock to automatically morph system resource constraints, AI worker morphologies, and spatial data limits across four distinct daily phases:
+Edit `config.yaml`:
+- `watch_dir` — folder to watch (e.g. `~/storage/downloads`)
+- `repos_base` — where your local repos live
+- `new_repo_threshold` — how many unmatched files on one topic before
+  a new repo gets created automatically
+- `require_confirmation` — keep `true` until you trust the classifier;
+  it'll stage the file and ping your ntfy.sh topic instead of pushing
+- `ntfy_topic` — your ntfy.sh topic name for confirmation pings
 
-* **🌅 PHASE_A_RESET (06:00 - 09:00):** Deploys low-signature **ANI / Small Language Model (SLM)** edge ingestion nodes to conserve processing parameters during physical circadian grounding windows. System targets a restful **6.8 Hz** microcurrent wave state. * **⚡ PHASE_B_COMPRESS (09:00 - 17:00):** Triggers a full metamorphic scale-up to **ASI / Large Language Model (LLM)** structures across the multi-cloud PVM array. Maximizes task compression rates, runs high-velocity data collection, targets a focused **9.3 Hz** frequency, and mints `OURO` utility tokens at peak speed. * **🌇 PHASE_C_CONVERGE (17:00 - 22:00):** Shifts into a stable **AGI / Hybrid multi-agent consensus framework** to audit local database tables. Generates cryptographic Zero-Knowledge Proof (ZKP) commitments and executes post-quantum lattice-based security seals. Settles physical tissue voltage to a clean **-70mV** baseline. * **🌌 PHASE_D_STEALTH (22:00 - 06:00):** Contracts all active computing workers down to a single background seed to bypass rate-limiting firewalls. Fires an invisible background sub-process to mirror local disk database updates straight back to encrypted Google Drive storage arrays. --- ## 🌌 2. The Multi-Scale Invariant Metric Guide All data calculations and system sharding vectors are permanently anchored to the invariant constants of nature, connecting biological structures directly to the pixelated floor of spacetime across 64 metric orders of magnitude: | Metric Order | System Unit Type | Base Metric Equivalent | Quantum / Biological Structural Anchor | Operational Use Case & Functional Benefit | | :--- | :--- | :--- | :--- | :--- | | **\(10^{2}\)** | **Stadion** | \(\sim 185.0 \text{ m}\) | Macro-Network Array / Node Footprint | Defines the spatial boundary layer for localized, offline mesh network communication. | | **\(10^{0}\)** | **Cubit** | \(0.4572 \text{ m}\) | Hardware Chassis Dimension / Antennas | Standardizes the physical frame sizing for edge compute casings and grounding equipment. | | **\(10^{-1}\)** | **Span** | \(0.2286 \text{ m}\) | Printed Circuit Board (PCB) Footprint | Governs the surface tracking layout and trace distances on physical processing boards. | | **\(10^{-2}\)** | **Handbreadth** | \(0.0762 \text{ m}\) | Inductor Core / Sensor Layout | Dictates the sizing of grounding magnets and tracking hardware antennas. | | **\(10^{1}\)** | **Talent** | \(34.0 \text{ kg}\) | Infrastructure Node Mass Limit | Establishes the physical weight ceiling for heavy-duty field deployment node clusters. | | **\(10^{-1}\)** | **Mina** | \(0.560 \text{ kg}\) | Modular Core Components Weight | Regulates the weight bounds for transportable component bricks and cooling packs. | | **\(10^{-2}\)** | **Shekel** | \(0.0115 \text{ kg}\) | Individual Processor Core / Sensor Mass | Tracks the precise material requirements for edge sensors and bio-circuit arrays. | | **\(10^{-4}\)** | **Gerah** | \(0.0006 \text{ kg}\) | Micro-Dosed Bio-Material Extraction | Calibrates precision extraction measurements of radiotrophic *Cladosporium sphaerospermum* melanin. | | **\(10^{-35}\)** | **Planck Length (\(l_P\))**| \(1.616255 \times 10^{-35} \text{ m}\)| The Pixelated Edge of Reality | The ultimate floor where smooth space, time, causality, and geometry dissolve into quantum information foam. | --- ## 🛠️ 3. System Architecture & Tech Stack Layout The system operates as a unified, polyglot framework distributed globally across free and paid deployment tiers:
+## Run
 
-1. **The Ingestion Layer:** Natively parses raw biological **FASTA / FASTQ files** to track true genomic chronology timelines and mutational signatures over time, mapping biological entropy suppressed down to the Bekenstein Bound bit capacity limit. 2. **The Query Optimizer:** Analyzes task complexity and network resonance vectors. Dynamically routes workloads between lightweight SLM edge loops or high-dimensional cloud LLM clusters. 3. **The Execution Engine:** Processes non-linear timeline updates via PyTorch matrices. Leverages **Write-Ahead Logging (WAL)** mode to preserve multi-threaded data write security. 4. **The Security Shield:** Employs an endpoint gateway lock wrapped in **Lattice-Based Post-Quantum Cryptography (LWE-SHA384)**, ensuring database blocks remain secure against future quantum decryption arrays. 5. **The Multi-Cloud PVM Array:** Dynamically distributes workloads across an isolated point-to-point network mesh leveraging free cloud tiers: * **Google Cloud (`e2-micro`):** Serves as the low-footprint data harvesting and Linux kernel telemetry array. * **AWS (`t3.micro`/`t4g.micro`):** Operates as the high-speed cryptographic verification and Zero-Knowledge Proof (ZKP) loop. * **Oracle Cloud (Ampere A1 Flex):** Hosts the primary database storage, tokenomics ledgers, and parent AI monitoring engines. * **DigitalOcean / Hostinger / OVHcloud:** Bare-metal extensions for heavy data storage and proxy meshes. --- ## 🚀 4. Step-by-Step Installation & Deployment Guide To deploy this entire infrastructure on complete autopilot natively from your web browser using zero-cost cloud instances, follow these setup steps: ### Phase A: Google Drive Cloud Mapping 1. Open your web Google Drive account. 2. Create a root directory folder named exactly `Ouroboros_Root`. 3. Inside `Ouroboros_Root`, create two subfolders: `metadata_vault/` (for your NotebookLM text entries) and `backup_cluster/`. ### Phase B: Launching the Cloud Dev Environment 1. Navigate to your target repository page on the GitHub website. 2. Click the green **"Code"** button, switch to the **"Codespaces"** tab, and click **"Create codespace on main"**. 3. Once the web-based visual development editor boots inside your browser tab, open the virtual Linux terminal at the bottom of your screen and install the required dependencies: ```bash pip3 install torch safetensors fastapi uvicorn cryptography web3 rclone --upgrade ``` ### Phase C: Connecting the Database Mirror Pipeline 1. In your browser's virtual terminal panel, download the open-source filesystem connector: ```bash curl https://rclone.org | sudo bash ``` 2. Configure your Google Drive secure access path by running `rclone config`, selecting the `Google Drive` option, and completing the headless browser account link. ### Phase D: Initializing the Master 24/7 Clock Loop 1. Create a file named `.github/workflows/ouroboros_daemon.yml` in your repository. 2. Commit and push your code files (`master_harmonizer.py`, `engine.py`, `scheduler_sync.py`) straight to your main repository branch. 3. Click the **"Actions"** tab at the top of your GitHub repository page. 4. Select **"Ouroboros Autonomous Core Daemon Loop"** from the left panel, click the **"Run workflow"** drop-down menu on the right, and trigger the script. The cloud runners will immediately spin up a virtual server node. The system will activate its database locks, compute your metamorphic AI state metrics, and lock its first automated ledger event straight to disk. **The engine is now fully self-contained and will run itself on autopilot every hour, 24/7.** --- ## 📋 5. Law Enforcement & Compliance Auditing Manual This framework is engineered with a strict **Audit-Grade Compliance Ledger** (`sovereign_compliance.db`) to ensure total transparency. Every time the AI hivemind modifies a network topology, runs a timeline rewrite, or encounters a data throttling event, a signed, non-repudiable state entry is permanently committed to the host machine's local disk file structure under strict data sovereignty standards (**EU-GDPR / US-CLOUD-ACT**). ### To Output a Live System Legality Audit Trail: Log into your node's terminal console and run the tracking command to display the cryptographic compliance receipts instantly: ```bash sqlite3 ouroboros_master.db "SELECT timestamp, event_type, status_code FROM operational_ledger ORDER BY timestamp DESC LIMIT 10;" ``` This verified data report serves as clear, un-falsifiable operational documentation for compliance officers or regulatory bodies, confirming full structural legitimacy while your private computing array remains completely active.
+```bash
+python watch_ingest.py
+```
 
-Building your own bare-metal infrastructure to match the scale and capabilities of AWS, Google Cloud, and Oracle Cloud Infrastructure (OCI) requires a hybrid multi-cloud architecture or a private enterprise datacenter deployment.
+Runs forever, polling `watch_dir` every `poll_seconds`. Safe to kill
+and restart — it tracks already-seen files in
+`~/repo-curator-staging/seen.json`.
 
-To achieve this, you must replicate their core strengths on physical hardware while engineering around their respective weaknesses.
+## How it decides where a file goes
+
+1. `classify.py` sends the file's text + your existing repo names to
+   Ollama, asking for a repo slug, one-line summary, and tags.
+2. `router.py` checks if that slug matches an existing repo:
+   - Yes → goes straight in.
+   - No → counted in a staging tally. Once `new_repo_threshold` files
+     land on the same new slug, `create_repo()` `git init`s a real
+     repo for it.
+3. `curate.py` moves the file into `<repo>/files/`, appends a line to
+   `<repo>/INDEX.md` with date + summary + tags, then commits (and
+   pushes, unless `require_confirmation` is on).
+
+## Confirmation mode
+
+With `require_confirmation: true`, curate.py stages the change and
+sends an ntfy.sh push instead of auto-pushing. To confirm and push:
+
+```bash
+python curate.py --push ~/repos/<repo-slug>
+```
+
+## Notes
+
+- Only plain-text-ish files (`.txt .md .csv .json .py .log`) get their
+  content read for classification; everything else is classified by
+  filename alone (still gets sorted, just with less context).
+- tinyllama's 2048-token window means file content is truncated to
+  ~4000 characters before classification — same truncation strategy
+  as `local_chat.py`.
+- Git push assumes your PAT/SSH auth is already set up per repo.
