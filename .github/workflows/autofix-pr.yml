@@ -48,8 +48,8 @@ jobs:
         if: steps.git-check.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
-          commit-message: "Autofix: formatting and lint fixes"
-          title: "Automated formatting/lint fixes"
+          commit-message: 'Autofix: formatting and lint fixes'
+          title: 'Automated formatting/lint fixes'
           body: |
             Automated fixes from `ruff` and `black`.
 
