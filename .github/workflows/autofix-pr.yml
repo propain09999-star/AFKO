@@ -58,3 +58,4 @@ jobs:
             human in the loop for every change, no exceptions.
           branch: autofix/lint-formatting
           delete-branch: true   
+          # fix permissions
