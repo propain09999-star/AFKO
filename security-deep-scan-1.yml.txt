@@ -1,0 +1,71 @@
+name: Deep Security Scan (Unknown CVEs / Zero-Days / Secrets)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * *"  # daily — zero-day signatures/rules update constantly
+  workflow_call: {}
+
+permissions:
+  contents: read
+  security-events: write  # required for CodeQL to upload results
+
+jobs:
+  # --- Semantic vulnerability pattern analysis (catches classes of bugs
+  #     that have no CVE yet, unlike pip-audit which only matches known ones) ---
+  codeql:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Run CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+
+  # --- Container/OS-layer scan: catches vulns in the ffmpeg/whisper.cpp/
+  #     Ollama base image itself, which pip-audit never sees since those
+  #     aren't Python packages ---
+  container-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t local-scan-target:latest .
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "local-scan-target:latest"
+          format: "sarif"
+          output: "trivy-results.sarif"
+          severity: "CRITICAL,HIGH,MEDIUM"
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "trivy-results.sarif"
+
+  # --- Secret scanning: API keys, tokens, credentials accidentally
+  #     committed (e.g. Google Drive/ntfy.sh/GHCR tokens) ---
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history so it catches secrets from old commits too
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

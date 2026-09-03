@@ -1,5 +1,5 @@
 # File: main.py
-# Execution: python3 main.py
+# Execution: python3 main.py "your objective here"
 # Environment: Linux Virtual Environment inside PRoot Ubuntu Container
 
 import os
@@ -9,11 +9,16 @@ import requests
 import json
 
 class AutonomousLocalAgent:
-    def __init__(self, data_directory="./data_vault"):
+    def __init__(self, data_directory="./data_vault", light_model="tinyllama:latest", heavy_model="tinyllama:latest"):
         self.ollama_url = "http://localhost:11434/api/generate"
         self.data_dir = data_directory
         self.thermal_limit_celsius = 40.0
-        
+        # Both default to tinyllama since that's the only model actually
+        # pulled on the Moto G right now. Pass heavy_model= explicitly
+        # once you've pulled a second model (e.g. phi3:mini) to test with.
+        self.light_model = light_model
+        self.heavy_model = heavy_model
+
         # Automatically establish a local folder to read system inputs
         if not os.path.exists(self.data_dir):
             os.makedirs(self.data_dir)
@@ -52,13 +57,12 @@ class AutonomousLocalAgent:
         return combined_text_context
 
     def select_local_model_dynamically(self, metrics):
-        # FIXED: Merged methods and made the hardware routing logic real
         if metrics["temperature_celsius"] > self.thermal_limit_celsius or metrics["free_ram_gb"] < 2.0:
             print("[-] Hardware Strained. Selecting low-overhead model.")
-            return "tinyllama:latest"  # Preserves battery and device stability
+            return self.light_model
         else:
             print("[+] Resources Optimal. Selecting smart model.")
-            return "phi3:mini"       # Unlocks advanced community context parsing
+            return self.heavy_model
 
     def execute_autonomous_loop(self, user_objective):
         telemetry = self.read_local_system_telemetry()
@@ -89,7 +93,10 @@ class AutonomousLocalAgent:
 if __name__ == "__main__":
     agent = AutonomousLocalAgent()
     print("[+] KISMET Local Architecture Framework Initialized.")
-    
-    task = "Summarize the major community assets found inside the data vault files."
+
+    task = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else \
+        "Summarize the major community assets found inside the data vault files."
+
     agent_output = agent.execute_autonomous_loop(task)
-    print(f"\n[Agent Autonomous Next Step Selection]:\n{agent_output}")
+    print(f"\n[Agent Response]:\n{agent_output}")
+    

@@ -1,0 +1,68 @@
+name: CI - Build & Test
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_call: {}
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # --- System-level dependencies your pipeline actually needs ---
+      - name: Install ffmpeg (capture.py)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Cache whisper.cpp build
+        id: cache-whisper
+        uses: actions/cache@v4
+        with:
+          path: whisper.cpp
+          key: whisper-cpp-${{ runner.os }}-v1
+
+      - name: Build whisper.cpp (transcribe.py)
+        if: steps.cache-whisper.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/ggerganov/whisper.cpp.git
+          cd whisper.cpp
+          make
+
+      - name: Install Ollama (extract.py)
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+
+      - name: Pull SLM model
+        run: |
+          ollama serve &
+          sleep 5
+          ollama pull tinyllama
+
+      # --- Python-level dependencies ---
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      # --- Actually exercise the pipeline ---
+      - name: Run unit tests
+        run: pytest tests/ -v
+
+      - name: Smoke test main.py orchestrator (dry run)
+        run: python main.py --config config.yaml --dry-run
+
+      - name: Validate config.yaml schema
+        run: python -c "import yaml; yaml.safe_load(open('config.yaml'))"

@@ -1,0 +1,40 @@
+name: Backtest Regression Check
+
+on:
+  push:
+    paths:
+      - 'backtest_engine.py'
+      - 'orchestration_schema.py'
+      - 'strategy_*.py'
+      - '*.csv'
+  pull_request:
+    paths:
+      - 'backtest_engine.py'
+      - 'orchestration_schema.py'
+      - 'strategy_*.py'
+      - '*.csv'
+  workflow_dispatch: {}
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pydantic
+
+      - name: Run backtest and check thresholds
+        run: python ci_backtest_check.py
+
+      - name: Upload backtest report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backtest-report
+          path: backtest_report.txt

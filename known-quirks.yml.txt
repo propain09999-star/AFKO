@@ -1,0 +1,29 @@
+# contracts/known-quirks.yml
+#
+# GENERIC TEMPLATE — not tied to any specific project.
+#
+# This is the ONLY thing that can correctly separate "wrong" from
+# "unusual on purpose." A pattern-matcher cannot tell these apart by
+# reading code — it has no access to why a decision was made. This
+# file is that missing context, written once by a human.
+#
+# Anything flagged by an automated checker (linter, invariant checker,
+# security scanner, LLM reviewer) gets cross-referenced against this
+# list before it's surfaced as a real issue. A match here suppresses
+# the flag and shows the reason instead.
+
+quirks:
+  - id: "example-001"
+    matches:
+      # Can match a file path, function name, invariant name, or
+      # scanner rule ID — scripts/quirk_filter.py checks all of them
+      file: "example_module.py"
+      function: "example_function"
+    reason: "Deliberately truncates input to N units to stay under a downstream context limit — looks like data loss, is not."
+    added_by: "human, not inferred"
+    date_added: "YYYY-MM-DD"
+    review_by: "YYYY-MM-DD or 'permanent'"  # quirks should expire and get re-confirmed, not accumulate forever
+
+  # Add one entry per intentional-but-suspicious-looking behavior.
+  # If you can't articulate the reason in one sentence, it's probably
+  # actually a bug — write the ticket instead of the quirk entry.

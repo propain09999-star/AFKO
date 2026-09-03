@@ -1,0 +1,130 @@
+name: Behavior Verification (Red/Blue/Purple Double-Check)
+
+on:
+  workflow_call:
+    inputs:
+      output-file:
+        required: true
+        type: string
+      test-results-file:
+        required: false
+        type: string
+
+jobs:
+  # --- Stage 1: mechanical checks, no judgment involved ---
+  invariant-check:
+    runs-on: ubuntu-latest
+    outputs:
+      critical-failure: ${{ steps.check.outputs.critical }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install pyyaml
+      - name: Run invariant checker
+        id: check
+        run: |
+          python scripts/check_invariants.py --output "${{ inputs.output-file }}" --contract contracts/invariants.yml \
+            > invariant-report.txt; echo "critical=$?" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: invariant-report
+          path: invariant-report.txt
+
+  # --- Stage 2: filter anything flagged through known-intentional quirks ---
+  quirk-filter:
+    needs: invariant-check
+    runs-on: ubuntu-latest
+    outputs:
+      unresolved-count: ${{ steps.filter.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install pyyaml
+      - name: Convert invariant failures to structured issues + filter
+        id: filter
+        run: |
+          python scripts/quirk_filter.py --input flagged_issues.json --quirks contracts/known-quirks.yml \
+            > quirk-filter-report.txt; echo "count=$?" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quirk-filter-report
+          path: quirk-filter-report.txt
+
+  # --- BLUE TEAM: independent OUTPUT-evidence pass (invariants/quirks/tests) ---
+  blue-confirm:
+    needs: quirk-filter
+    if: needs.quirk-filter.outputs.unresolved-count != '0'
+    runs-on: ubuntu-latest
+    outputs:
+      verdict: ${{ steps.blue.outputs.verdict }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install pyyaml
+      - name: Run blue-team confirm pass
+        id: blue
+        run: |
+          python scripts/blue_confirm.py \
+            --invariant-report invariant-report.txt \
+            --quirk-report quirk-filter-report.txt \
+            --test-diff test-result-diff.txt \
+            > blue-report.txt
+          if grep -q "verdict=safe" blue-report.txt; then
+            echo "verdict=safe" >> "$GITHUB_OUTPUT"
+          else
+            echo "verdict=unsafe" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: blue-report
+          path: blue-report.txt
+
+  # --- RED TEAM: independent CODE-structure pass (diff/paths/patterns) ---
+  red-falsify:
+    needs: quirk-filter
+    if: needs.quirk-filter.outputs.unresolved-count != '0'
+    runs-on: ubuntu-latest
+    outputs:
+      verdict: ${{ steps.red.outputs.verdict }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: pip install pyyaml
+      - name: Generate diff against main
+        run: git diff origin/main...HEAD > pr.diff
+      - name: Run red-team falsify pass
+        id: red
+        run: |
+          python scripts/red_falsify.py \
+            --diff pr.diff \
+            --high-risk-paths contracts/high-risk-paths.yml \
+            > red-report.txt
+          if grep -q "verdict=safe" red-report.txt; then
+            echo "verdict=safe" >> "$GITHUB_OUTPUT"
+          else
+            echo "verdict=unsafe" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: red-report
+          path: red-report.txt
+
+  # --- PURPLE: arbitrates. Agreement resolves automatically in the
+  #     safe direction only (both say safe -> pass). Any disagreement,
+  #     or red flagging a problem, escalates to a human. Purple never
+  #     overrides red on its own authority. ---
+  purple-arbitrate:
+    needs: [blue-confirm, red-falsify]
+    if: always() && (needs.blue-confirm.result == 'success' || needs.red-falsify.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Arbitrate blue vs red verdicts
+        run: |
+          BLUE="${{ needs.blue-confirm.outputs.verdict }}"
+          RED="${{ needs.red-falsify.outputs.verdict }}"
+          echo "Blue verdict: $BLUE"
+          echo "Red verdict: $RED"
+          if [ "$BLUE" = "safe" ] && [ "$RED" = "safe" ]; then
+            echo "Both independent passes agree — resolved without escalation."
+          else
+            echo "No agreement (or red found a problem) — escalating to human review."
+            exit 1
+          fi

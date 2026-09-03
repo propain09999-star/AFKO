@@ -1,0 +1,105 @@
+name: Behavior Verification (Red/Blue/Purple Double-Check)
+
+on:
+  workflow_call:
+    inputs:
+      output-file:
+        required: true
+        type: string
+      test-results-file:
+        required: false
+        type: string
+
+jobs:
+  # --- Stage 1: mechanical checks, no judgment involved ---
+  invariant-check:
+    runs-on: ubuntu-latest
+    outputs:
+      critical-failure: ${{ steps.check.outputs.critical }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install pyyaml
+      - name: Run invariant checker
+        id: check
+        run: |
+          python scripts/check_invariants.py --output "${{ inputs.output-file }}" --contract contracts/invariants.yml \
+            > invariant-report.txt; echo "critical=$?" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: invariant-report
+          path: invariant-report.txt
+
+  # --- Stage 2: filter anything flagged through known-intentional quirks ---
+  quirk-filter:
+    needs: invariant-check
+    runs-on: ubuntu-latest
+    outputs:
+      unresolved-count: ${{ steps.filter.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install pyyaml
+      - name: Convert invariant failures to structured issues + filter
+        id: filter
+        run: |
+          python scripts/quirk_filter.py --input flagged_issues.json --quirks contracts/known-quirks.yml \
+            > quirk-filter-report.txt; echo "count=$?" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quirk-filter-report
+          path: quirk-filter-report.txt
+
+  # --- BLUE TEAM: tries to CONFIRM the flagged behavior is actually fine ---
+  blue-confirm:
+    needs: quirk-filter
+    if: needs.quirk-filter.outputs.unresolved-count != '0'
+    runs-on: ubuntu-latest
+    outputs:
+      verdict: ${{ steps.blue.outputs.verdict }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Argue the change is safe, cite evidence
+        id: blue
+        run: |
+          echo "Blue-team pass: reviews the unresolved flag(s) and argues FOR safety,"
+          echo "citing invariant results, quirk registry near-misses, and test diffs."
+          echo "This is advisory input for a human, not an automated approval."
+          echo "verdict=inconclusive" >> "$GITHUB_OUTPUT"
+
+  # --- RED TEAM: tries to BREAK that confirmation, independently ---
+  red-falsify:
+    needs: quirk-filter
+    if: needs.quirk-filter.outputs.unresolved-count != '0'
+    runs-on: ubuntu-latest
+    outputs:
+      verdict: ${{ steps.red.outputs.verdict }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Argue the change is UNSAFE, look for the strongest counter-case
+        id: red
+        run: |
+          echo "Red-team pass: independently reviews the SAME unresolved flag(s)"
+          echo "and actively tries to find why they are NOT safe — different"
+          echo "reviewer/method than blue-confirm, so they can't share a blind spot."
+          echo "verdict=inconclusive" >> "$GITHUB_OUTPUT"
+
+  # --- PURPLE: arbitrates. Agreement resolves automatically in the
+  #     safe direction only (both say safe -> pass). Any disagreement,
+  #     or red flagging a problem, escalates to a human. Purple never
+  #     overrides red on its own authority. ---
+  purple-arbitrate:
+    needs: [blue-confirm, red-falsify]
+    if: always() && (needs.blue-confirm.result == 'success' || needs.red-falsify.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Arbitrate blue vs red verdicts
+        run: |
+          BLUE="${{ needs.blue-confirm.outputs.verdict }}"
+          RED="${{ needs.red-falsify.outputs.verdict }}"
+          echo "Blue verdict: $BLUE"
+          echo "Red verdict: $RED"
+          if [ "$BLUE" = "safe" ] && [ "$RED" = "safe" ]; then
+            echo "Both independent passes agree — resolved without escalation."
+          else
+            echo "No agreement (or red found a problem) — escalating to human review."
+            exit 1
+          fi

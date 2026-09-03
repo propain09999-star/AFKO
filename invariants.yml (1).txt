@@ -1,0 +1,44 @@
+# contracts/invariants.yml
+#
+# Matches the REAL output shape of main.py's process_chunk(), verified
+# against the actual repo (not guessed): {timestamp, station, hits,
+# transcript, extracted}. No confidence score, no notification field,
+# no per-detection timestamp — those don't exist in this codebase.
+
+invariants:
+  - name: "hits_is_a_list"
+    description: "hits must always be a list (possibly empty), never null/missing — a missing hits field would silently break the 'if entry[hits]:' check in main.py"
+    field: "hits"
+    rule: "value is not None"
+    severity: "critical"
+
+  - name: "transcript_present_when_hit_fired"
+    description: "If hits is non-empty, transcript that produced it must be recorded — a hit with no transcript is unauditable"
+    field: "transcript"
+    rule: "value is not None and len(value) > 0"
+    severity: "critical"
+    depends_on: "len(hits) > 0"
+
+  - name: "extraction_absent_on_no_hit"
+    description: "extracted must be None when there was no hit — extract_fields should never run on a non-match (wastes an Ollama call, and a non-null value here means the enabled-check was bypassed)"
+    field: "extracted"
+    rule: "value is None"
+    severity: "high"
+    depends_on: "len(hits) == 0"
+
+  - name: "extraction_error_not_silently_dropped"
+    description: "If extraction was attempted and failed, the error must still be visible in extracted — not swallowed into a None or empty transcript log"
+    field: "extracted"
+    rule: "value is not None"
+    severity: "high"
+    depends_on: "len(hits) > 0 and extraction_enabled == true"
+
+  - name: "timestamp_is_iso8601"
+    description: "Every logged entry must have a parseable timestamp — a malformed timestamp breaks any downstream log analysis"
+    field: "timestamp"
+    rule: "value is not None and len(value) >= 19"
+    severity: "critical"
+
+  # Add more here as real edge cases show up in logs/hits.jsonl —
+  # each one should encode a fact you've confirmed true about correct
+  # output, not a guess about what looks normal.

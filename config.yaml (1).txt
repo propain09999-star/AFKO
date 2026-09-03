@@ -1,0 +1,58 @@
+# config.yaml — auto-ingest pipeline config
+
+# Folder to watch for new files. On Termux: ~/storage/downloads
+# (after `termux-setup-storage`). Expand ~ at runtime, not here.
+watch_dir: "~/storage/downloads"
+
+# Where your local repos live — router.py scans this for existing
+# repo directories to match against.
+repo_base_path: "~/repos"
+
+# Ollama connection — same pattern as extract.py in radio-sweepstakes-detector
+ollama_host: "http://localhost:11434"
+model: "tinyllama"
+timeout_seconds: 60
+
+# How often watch_ingest.py polls the folder, in seconds
+poll_interval_seconds: 30
+
+# Safety: nothing commits/pushes without this being false, and even
+# then new-repo creation always requires confirmation regardless
+# (see new_repo_requires_confirmation below). Start true, flip once
+# you've watched it classify a batch of real files correctly.
+dry_run: true
+
+# A new repo is only auto-created after this many files classify to
+# the same not-yet-existing slug — prevents repo-sprawl from one-off
+# files. Below this count, files go to a holding area instead.
+new_repo_threshold: 3
+
+# Even after the threshold is hit, still ask before creating —
+# matches your stated preference for reviewing AI output rather than
+# trusting it blindly. Set false only once you trust the classifier's
+# slug choices consistently.
+new_repo_requires_confirmation: true
+
+# Files below this size (bytes) are skipped — avoids classifying
+# empty/partial downloads still being written to disk
+min_file_size_bytes: 16
+
+# File extensions read as plain text for classification context.
+# Anything else falls back to classifying by filename alone —
+# no PDF/docx extraction here yet (see NEXT STEPS in README).
+text_extensions: [".txt", ".md"]
+
+# Where pending (below-threshold or unconfirmed) items are tracked
+pending_log: "pending_ingest.jsonl"
+
+# Where every processed decision gets logged, dry-run or not — this
+# is your audit trail for what the classifier decided and why
+decision_log: "ingest_log.jsonl"
+
+git:
+  # Personal access token read from this env var, same pattern as
+  # your existing GitHub setup — never put the token in this file
+  pat_env_var: "GITHUB_PAT"
+  commit_author_name: "auto-ingest-bot"
+  commit_author_email: "auto-ingest-bot@localhost"
+  remote_url_template: "https://{pat}@github.com/YOUR_USERNAME/{repo}.git"
