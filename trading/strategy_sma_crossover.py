@@ -13,13 +13,12 @@ Plugs directly into BacktestEngine's strategy callable signature:
 """
 
 from __future__ import annotations
-from typing import Optional
 
 from backtest_engine import Candle
 from orchestration_schema import OrderParams
 
 
-def _sma(values: list[float], period: int) -> Optional[float]:
+def _sma(values: list[float], period: int) -> float | None:
     if len(values) < period:
         return None
     return sum(values[-period:]) / period
@@ -50,7 +49,7 @@ class SmaCrossoverStrategy:
         self.max_account_risk_pct = max_account_risk_pct
         self._currently_long = False
 
-    def __call__(self, history: list[Candle]) -> Optional[OrderParams]:
+    def __call__(self, history: list[Candle]) -> OrderParams | None:
         if len(history) < self.slow_period + 1:
             return None
 
@@ -98,6 +97,7 @@ if __name__ == "__main__":
     # backtest_engine.py's self-test, so this file is runnable standalone.
     import random
     from datetime import datetime, timedelta
+
     from backtest_engine import BacktestEngine
 
     random.seed(7)
@@ -110,7 +110,9 @@ if __name__ == "__main__":
         close_p = price + change
         high_p = max(open_p, close_p) + random.uniform(0, 0.0004)
         low_p = min(open_p, close_p) - random.uniform(0, 0.0004)
-        candles.append(Candle(start + timedelta(hours=i), "EURUSD", open_p, high_p, low_p, close_p))
+        candles.append(
+            Candle(start + timedelta(hours=i), "EURUSD", open_p, high_p, low_p, close_p)
+        )
         price = close_p
 
     strategy = SmaCrossoverStrategy(fast_period=10, slow_period=30)

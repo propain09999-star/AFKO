@@ -11,9 +11,9 @@ field with a real, validated value, it shouldn't produce an order.
 """
 
 from __future__ import annotations
+
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -49,7 +49,7 @@ class OrderParams(BaseModel):
     dry_run: bool = True  # must be explicitly flipped to False to go live
 
     # --- Optional context, purely informational, never used for logic ---
-    notes: Optional[str] = Field(default=None, max_length=280)
+    notes: str | None = Field(default=None, max_length=280)
 
     # Hard system-wide ceiling. A strategy can request less; it can never
     # request more than this no matter what the field-level validator allows.
@@ -71,7 +71,7 @@ class OrderParams(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def enforce_hard_caps(self) -> "OrderParams":
+    def enforce_hard_caps(self) -> OrderParams:
         if self.vol_lots > self.MAX_LOTS_PER_ORDER:
             raise ValueError(
                 f"vol_lots {self.vol_lots} exceeds hard system cap "

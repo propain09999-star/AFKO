@@ -26,9 +26,11 @@ from backtest_engine import BacktestEngine, Candle
 from strategy_sma_crossover import SmaCrossoverStrategy
 
 # --- Fixed thresholds - adjust these to match your actual expectations ---
-MAX_ACCEPTABLE_DRAWDOWN_PCT = 25.0   # fail if drawdown exceeds this % of starting balance
-MIN_ACCEPTABLE_WIN_RATE = 0.0        # set a real floor once you have real data
-REQUIRE_NO_CRASH = True              # the engine must run start-to-finish without exceptions
+MAX_ACCEPTABLE_DRAWDOWN_PCT = (
+    25.0  # fail if drawdown exceeds this % of starting balance
+)
+MIN_ACCEPTABLE_WIN_RATE = 0.0  # set a real floor once you have real data
+REQUIRE_NO_CRASH = True  # the engine must run start-to-finish without exceptions
 
 
 def generate_fixed_dataset(seed: int = 42, num_candles: int = 2000) -> list[Candle]:
@@ -45,7 +47,9 @@ def generate_fixed_dataset(seed: int = 42, num_candles: int = 2000) -> list[Cand
         close_p = price + change
         high_p = max(open_p, close_p) + random.uniform(0, 0.0004)
         low_p = min(open_p, close_p) - random.uniform(0, 0.0004)
-        candles.append(Candle(start + timedelta(hours=i), "EURUSD", open_p, high_p, low_p, close_p))
+        candles.append(
+            Candle(start + timedelta(hours=i), "EURUSD", open_p, high_p, low_p, close_p)
+        )
         price = close_p
     return candles
 
@@ -70,7 +74,9 @@ def main() -> int:
     report_lines.append("")
 
     drawdown_pct = (result.max_drawdown / result.starting_balance) * 100
-    report_lines.append(f"Drawdown %: {drawdown_pct:.2f}% (limit: {MAX_ACCEPTABLE_DRAWDOWN_PCT}%)")
+    report_lines.append(
+        f"Drawdown %: {drawdown_pct:.2f}% (limit: {MAX_ACCEPTABLE_DRAWDOWN_PCT}%)"
+    )
 
     if drawdown_pct > MAX_ACCEPTABLE_DRAWDOWN_PCT:
         report_lines.append(
