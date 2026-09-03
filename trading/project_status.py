@@ -23,8 +23,8 @@ Run it any time you want an honest read on where things stand:
 """
 
 from __future__ import annotations
+
 import importlib.util
-import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent
@@ -50,7 +50,10 @@ def check_schema() -> tuple[bool, str]:
     if not _file_exists("orchestration_schema.py"):
         return False, "orchestration_schema.py not found"
     if not _module_importable("orchestration_schema"):
-        return False, "orchestration_schema.py exists but fails to import (check for syntax/dependency errors)"
+        return (
+            False,
+            "orchestration_schema.py exists but fails to import (check for syntax/dependency errors)",
+        )
     return True, "Schema exists and imports cleanly"
 
 
@@ -58,7 +61,9 @@ def check_backtest_engine() -> tuple[bool, str]:
     if not _file_exists("backtest_engine.py"):
         return False, "backtest_engine.py not found"
     try:
-        spec = importlib.util.spec_from_file_location("backtest_engine", REPO_ROOT / "backtest_engine.py")
+        spec = importlib.util.spec_from_file_location(
+            "backtest_engine", REPO_ROOT / "backtest_engine.py"
+        )
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         # Actually try running the engine's own self-test data through it
@@ -71,7 +76,16 @@ def check_backtest_engine() -> tuple[bool, str]:
         start = datetime(2026, 1, 1)
         for i in range(100):
             close_p = price + random.uniform(-0.001, 0.001)
-            candles.append(module.Candle(start + timedelta(hours=i), "EURUSD", price, max(price, close_p), min(price, close_p), close_p))
+            candles.append(
+                module.Candle(
+                    start + timedelta(hours=i),
+                    "EURUSD",
+                    price,
+                    max(price, close_p),
+                    min(price, close_p),
+                    close_p,
+                )
+            )
             price = close_p
 
         def noop_strategy(history):
@@ -101,7 +115,15 @@ def check_realistic_costs() -> tuple[bool, str]:
     has_commission = "commission_per_lot" in content
     if has_spread and has_slippage and has_commission:
         return True, "Spread, slippage, and commission are all modeled"
-    missing = [n for n, present in [("spread", has_spread), ("slippage", has_slippage), ("commission", has_commission)] if not present]
+    missing = [
+        n
+        for n, present in [
+            ("spread", has_spread),
+            ("slippage", has_slippage),
+            ("commission", has_commission),
+        ]
+        if not present
+    ]
     return False, f"Missing cost modeling: {', '.join(missing)}"
 
 
@@ -110,8 +132,14 @@ def check_real_data_loaded() -> tuple[bool, str]:
         return False, "data_loader.py not found"
     csv_files = [f for f in REPO_ROOT.glob("*.csv") if "sample" not in f.name.lower()]
     if not csv_files:
-        return False, "data_loader.py exists but no non-sample CSV data found in repo (this check can't see data you've loaded but not committed - that's fine, just confirm manually)"
-    return True, f"Found data file(s) beyond the sample: {', '.join(f.name for f in csv_files)}"
+        return (
+            False,
+            "data_loader.py exists but no non-sample CSV data found in repo (this check can't see data you've loaded but not committed - that's fine, just confirm manually)",
+        )
+    return (
+        True,
+        f"Found data file(s) beyond the sample: {', '.join(f.name for f in csv_files)}",
+    )
 
 
 def check_ci_backtest() -> tuple[bool, str]:
@@ -128,11 +156,17 @@ def check_paper_trading() -> tuple[bool, str]:
     # Deliberately not auto-detecting broker SDK imports here - this stage
     # should be a deliberate decision you make, not something that flips
     # to "done" because a library got installed for some other reason.
-    return False, "Not built yet (expected at this stage - don't build this until stages 1-6 are solid)"
+    return (
+        False,
+        "Not built yet (expected at this stage - don't build this until stages 1-6 are solid)",
+    )
 
 
 def check_live_gate() -> tuple[bool, str]:
-    return False, "Not built yet (should not exist until paper trading has run for a real stretch of time)"
+    return (
+        False,
+        "Not built yet (should not exist until paper trading has run for a real stretch of time)",
+    )
 
 
 def main() -> None:

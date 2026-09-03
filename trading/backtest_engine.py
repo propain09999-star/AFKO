@@ -20,11 +20,12 @@ silently coerced.
 """
 
 from __future__ import annotations
+
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Callable, Optional
 
-from orchestration_schema import OrderParams, Action
+from orchestration_schema import Action, OrderParams
 
 
 @dataclass
@@ -112,7 +113,7 @@ class BacktestEngine:
     def __init__(
         self,
         candles: list[Candle],
-        strategy: Callable[[list[Candle]], Optional[OrderParams]],
+        strategy: Callable[[list[Candle]], OrderParams | None],
         starting_balance: float = 10_000.0,
         pip_value: float = PIP_VALUE,
         spread_pips: float = 1.5,
@@ -139,7 +140,7 @@ class BacktestEngine:
         self.slippage_pips = slippage_pips
         self.commission_per_lot = commission_per_lot
         self.balance = starting_balance
-        self.open_position: Optional[Position] = None
+        self.open_position: Position | None = None
         self.trades: list[ClosedTrade] = []
 
     def run(self) -> BacktestResult:
@@ -157,7 +158,9 @@ class BacktestEngine:
 
         # Force-close anything still open at the end of the data
         if self.open_position:
-            self._close_position(self.candles[-1].close, self.candles[-1].timestamp, "end_of_data")
+            self._close_position(
+                self.candles[-1].close, self.candles[-1].timestamp, "end_of_data"
+            )
 
         return BacktestResult(
             starting_balance=self.starting_balance,
@@ -215,7 +218,9 @@ class BacktestEngine:
             elif candle.low <= pos.tp_price:
                 self._close_position(pos.tp_price, candle.timestamp, "tp")
 
-    def _close_position(self, exit_price: float, closed_at: datetime, reason: str) -> None:
+    def _close_position(
+        self, exit_price: float, closed_at: datetime, reason: str
+    ) -> None:
         pos = self.open_position
         assert pos is not None
 
@@ -269,10 +274,12 @@ if __name__ == "__main__":
         close_p = price + change
         high_p = max(open_p, close_p) + random.uniform(0, 0.0005)
         low_p = min(open_p, close_p) - random.uniform(0, 0.0005)
-        candles.append(Candle(start + timedelta(hours=i), "EURUSD", open_p, high_p, low_p, close_p))
+        candles.append(
+            Candle(start + timedelta(hours=i), "EURUSD", open_p, high_p, low_p, close_p)
+        )
         price = close_p
 
-    def toy_strategy(history: list[Candle]) -> Optional[OrderParams]:
+    def toy_strategy(history: list[Candle]) -> OrderParams | None:
         """
         Placeholder strategy: buy after 3 consecutive up-candles.
         Replace this with real logic - the point here is showing how a
@@ -296,7 +303,9 @@ if __name__ == "__main__":
         return None
 
     engine = BacktestEngine(candles, toy_strategy, starting_balance=10_000.0)
-    print(f"Running with spread={engine.spread_pips}p slippage={engine.slippage_pips}p "
-          f"commission=${engine.commission_per_lot}/lot (all costs on by default)\n")
+    print(
+        f"Running with spread={engine.spread_pips}p slippage={engine.slippage_pips}p "
+        f"commission=${engine.commission_per_lot}/lot (all costs on by default)\n"
+    )
     result = engine.run()
     print(result.summary())

@@ -12,6 +12,7 @@ market data vendor, etc).
 """
 
 from __future__ import annotations
+
 import csv
 from datetime import datetime
 from pathlib import Path
@@ -99,7 +100,7 @@ def load_candles_from_csv(path: str | Path, symbol: str) -> list[Candle]:
                         close=float(row[close_key]),
                     )
                 )
-            except (ValueError, KeyError) as e:
+            except (ValueError, KeyError):
                 # Skip malformed rows rather than crashing the whole load -
                 # real-world exports often have a stray blank line or two
                 continue
