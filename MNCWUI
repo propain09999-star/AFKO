@@ -6,6 +6,8 @@ import hashlib
 import threading
 import numpy as np
 
+from service_auth import APIKeyMiddleware
+
 # Framework Import Fallbacks for Standard Local Processing Environments
 try:
     from fastapi import FastAPI
@@ -26,6 +28,8 @@ except ImportError:
 # 🚀 CORE INTEGRATED KERNEL ENGINE
 # ──────────────────────────────────────────────────────────
 app = FastAPI()
+if FASTAPI_AVAILABLE:
+    app.add_middleware(APIKeyMiddleware, env_var="MNCWUI_API_KEY")
 
 class GrandUnifiedVisualEngine:
     def __init__(self, root_dir="vault_root"):
