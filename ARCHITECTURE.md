@@ -48,6 +48,14 @@ AFKO is designed as a local-first development and repo processing system that:
   - skip missing optional inputs cleanly
   - optionally start local runtime services
 
+### 7. AETHORFORGE Integration
+- `integrations/aethorforge` provides the optional telemetry and query service
+- AFKO starts it only when `AFKO_START_AETHORFORGE=true`
+- the service defaults to `http://127.0.0.1:8080`
+- AETHORFORGE dependencies are isolated in `integrations/aethorforge/requirements.txt`
+- AFKO publishes non-blocking pipeline status through `AETHORFORGE_URL`
+- `AFKO_PUBLISH_AETHORFORGE=true` publishes to an independently hosted service without starting a local one
+
 ## File roles
 - `github_auth.py` — GitHub token helper and API client abstraction
 - `TPF` — local-first pipeline implementation for repo scanning and patching

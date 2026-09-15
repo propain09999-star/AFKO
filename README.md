@@ -1,4 +1,13 @@
 # AFKO
+
+## Setup
+
+Install AFKO's runtime dependencies with:
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
 quantum-bio-dag/
 ├── README.md               # Setup instructions and dependency trees
 ├── requirements.txt         # Package dependencies (qiskit, qiskit-ibm-runtime, etc.)

@@ -6,9 +6,11 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass
+from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
 from kismet_cloud_ingress import CloudDataIngressHub
+from aethorforge_client import AethorforgeClient
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 TPF_PATH = SCRIPT_DIR / "TPF"
@@ -18,7 +20,8 @@ def load_pipeline_module():
     if not TPF_PATH.exists():
         raise FileNotFoundError(f"Missing pipeline file: {TPF_PATH}")
 
-    spec = importlib.util.spec_from_file_location("afko_tpf", TPF_PATH)
+    loader = SourceFileLoader("afko_tpf", str(TPF_PATH))
+    spec = importlib.util.spec_from_loader("afko_tpf", loader)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Unable to load pipeline module from {TPF_PATH}")
 
@@ -33,6 +36,11 @@ class EngineConfig:
     local_root: str
     query_limit: int
     start_runtime: bool
+    start_aethorforge: bool
+    publish_aethorforge: bool
+    aethorforge_host: str
+    aethorforge_port: int
+    aethorforge_url: str
     boot_script: str
     log_file: str
     assess_only: bool
@@ -81,14 +89,49 @@ class AfkoEngine:
         logging.info("Starting runtime service using boot script: %s", self.config.boot_script)
         subprocess.run([self.config.boot_script], check=False)
 
+    def start_aethorforge_service(self):
+        if not self.config.start_aethorforge:
+            logging.info("AETHORFORGE startup disabled.")
+            return
+
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "AETHORFORGE_HOST": self.config.aethorforge_host,
+                "AETHORFORGE_PORT": str(self.config.aethorforge_port),
+            }
+        )
+        logging.info(
+            "Starting AETHORFORGE service at http://%s:%s",
+            self.config.aethorforge_host,
+            self.config.aethorforge_port,
+        )
+        subprocess.Popen(
+            [sys.executable, "-m", "integrations.aethorforge.main"],
+            cwd=SCRIPT_DIR,
+            env=environment,
+            start_new_session=True,
+        )
+
+    def publish_aethorforge_status(self, state: str, **details):
+        if not (self.config.start_aethorforge or self.config.publish_aethorforge):
+            return
+        AethorforgeClient(self.config.aethorforge_url).publish_status(
+            {"state": state, **details}
+        )
+
     def run(self):
+        self.start_aethorforge_service()
+        self.publish_aethorforge_status("discovering", mode=self.config.mode)
         targets = self.discover_targets()
 
         if not self.config.assess_only:
             self.ingest_targets(targets)
             self.run_pipeline()
+            self.publish_aethorforge_status("completed", targets=len(targets))
         else:
             logging.info("Assess-only mode enabled; ingestion and pipeline are skipped.")
+            self.publish_aethorforge_status("assess_only", targets=len(targets))
 
         self.start_runtime_service()
 
@@ -99,6 +142,11 @@ def parse_args():
     parser.add_argument("--local-root", default=os.getenv("AFKO_LOCAL_REPO_ROOT", "."))
     parser.add_argument("--query-limit", type=int, default=int(os.getenv("AFKO_QUERY_LIMIT", "2")))
     parser.add_argument("--start-runtime", action="store_true", default=os.getenv("AFKO_START_RUNTIME", "false").lower() in ("1", "true", "yes"))
+    parser.add_argument("--start-aethorforge", action="store_true", default=os.getenv("AFKO_START_AETHORFORGE", "false").lower() in ("1", "true", "yes"))
+    parser.add_argument("--publish-aethorforge", action="store_true", default=os.getenv("AFKO_PUBLISH_AETHORFORGE", "false").lower() in ("1", "true", "yes"))
+    parser.add_argument("--aethorforge-host", default=os.getenv("AETHORFORGE_HOST", "127.0.0.1"))
+    parser.add_argument("--aethorforge-port", type=int, default=int(os.getenv("AETHORFORGE_PORT", "8080")))
+    parser.add_argument("--aethorforge-url", default=os.getenv("AETHORFORGE_URL", "http://127.0.0.1:8080"))
     parser.add_argument("--boot-script", default=os.getenv("AFKO_BOOT_SCRIPT", str(SCRIPT_DIR / "kismet_boot.sh")))
     parser.add_argument("--log-file", default=os.getenv("AFKO_SERVICE_LOG", str(SCRIPT_DIR / "afko_service.log")))
     parser.add_argument("--assess-only", action="store_true")
@@ -130,6 +178,11 @@ def main():
         local_root=args.local_root,
         query_limit=args.query_limit,
         start_runtime=args.start_runtime,
+        start_aethorforge=args.start_aethorforge,
+        publish_aethorforge=args.publish_aethorforge,
+        aethorforge_host=args.aethorforge_host,
+        aethorforge_port=args.aethorforge_port,
+        aethorforge_url=args.aethorforge_url,
         boot_script=args.boot_script,
         log_file=args.log_file,
         assess_only=args.assess_only,

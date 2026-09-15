@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AETHORFORGE | AFKO</title>
+  <style>
+    :root { color-scheme: dark; font-family: Georgia, serif; background: #101416; color: #e6eadf; }
+    body { max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+    h1 { color: #d8a84e; letter-spacing: .04em; }
+    .panel { border: 1px solid #46544c; background: #18201e; padding: 20px; margin-top: 24px; }
+    textarea { box-sizing: border-box; width: 100%; min-height: 110px; background: #0d1112; color: inherit; border: 1px solid #647064; padding: 12px; }
+    button { margin-top: 12px; background: #d8a84e; color: #16120b; border: 0; padding: 10px 16px; cursor: pointer; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; color: #b9d8bf; }
+  </style>
+</head>
+<body>
+  <h1>AETHORFORGE</h1>
+  <p>AFKO-integrated telemetry and routing console.</p>
+  <section class="panel">
+    <textarea id="query" placeholder="Send a query to the routing engine..."></textarea>
+    <button id="send">Route query</button>
+    <pre id="output">Loading telemetry...</pre>
+  </section>
+  <script>
+    const output = document.querySelector('#output');
+    async function refresh() {
+      const response = await fetch('/api/telemetry');
+      output.textContent = JSON.stringify(await response.json(), null, 2);
+    }
+    document.querySelector('#send').addEventListener('click', async () => {
+      await fetch('/api/query', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query: document.querySelector('#query').value}) });
+      await refresh();
+    });
+    refresh();
+  </script>
+</body>
+</html>
