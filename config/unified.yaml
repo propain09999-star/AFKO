@@ -1,0 +1,32 @@
+# Unified AFKO configuration
+
+project:
+  name: AFKO
+  mode: local-first
+  runtime: mobile-and-desktop
+
+stack:
+  local_first: true
+  offline_mode: true
+  require_agent_audit: true
+  guardrail_mode: strict
+
+integrations:
+  buzz:
+    enabled: true
+    description: human + agent event relay and workspace memory
+  event_horizon_mobile:
+    enabled: true
+    description: termux mobile orchestration runtime
+  worldmonitor:
+    enabled: true
+    description: geopolitical and operational intelligence feed
+  bittensor:
+    enabled: false
+    description: optional reward and decentralized compute layer
+
+execution:
+  policy: "no raw os.system; no eval/exec; prefer list-based subprocess calls"
+  security_scan: true
+  budget_tracking: true
+  audit_log: true
