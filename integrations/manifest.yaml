@@ -1,0 +1,32 @@
+# AFKO integration manifest
+
+stack:
+  primary:
+    - buzz
+    - event-horizon-mobile
+    - worldmonitor
+  optional:
+    - bittensor
+    - cloudstack
+    - ccxt
+    - gigatoken
+    - grok-build
+
+reasons:
+  buzz:
+    role: "agent coordination and shared room memory"
+    priority: 1
+  event-horizon-mobile:
+    role: "offline-first mobile runtime and task execution guardrails"
+    priority: 1
+  worldmonitor:
+    role: "situational awareness and intelligence context"
+    priority: 2
+  bittensor:
+    role: "optional incentive, trust, and decentralized compute layer"
+    priority: 3
+
+rules:
+  - "Only keep integrations that directly strengthen local-first, secure, auditable, autonomous execution."
+  - "Prefer small, intentionally scoped integrations over sprawling code imports."
+  - "Treat external repos as tools and boundaries, not as monolithic dependencies for core AFKO logic."
